@@ -92,13 +92,11 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         injectPlayer(player);
 
         // Schedule translation fingerprinter after probe_delay_ticks
-        if (config.translationProbeEnabled) {
-            SchedulerHelper.runTaskLater(this, () -> {
-                if (player.isOnline()) {
-                    vector1.probe(player);
-                }
-            }, config.probeDelayTicks);
-        }
+        SchedulerHelper.runTaskLater(this, () -> {
+            if (player.isOnline()) {
+                vector1.probe(player);
+            }
+        }, config.probeDelayTicks);
     }
 
     @EventHandler

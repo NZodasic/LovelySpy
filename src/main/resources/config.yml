@@ -1,6 +1,5 @@
 # LovelySpy configuration
 
-translation_probe_enabled: false # Safety default: prevents unreliable join-time sign scans
 probe_delay_ticks: 40          # Wait 2s for the normal login packet burst to settle
 confirmation_delay_ms: 300     # Time between probe and confirmation pass
 probe_timeout_ticks: 60        # No-response threshold (60 ticks = 3 seconds)

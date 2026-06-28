@@ -185,15 +185,6 @@ public final class Vector1_TranslationFingerprint {
             return;
         }
 
-        // A client cannot credibly expose a large collection of unrelated cheat
-        // translations at once. This pattern indicates a broken/modified sign
-        // response or packet-plugin incompatibility, never grounds for punishment.
-        if (new HashSet<>(totalFlagged).size() > 3) {
-            plugin.getLogger().warning("Discarded invalid mass-positive translation scan for "
-                    + player.getName() + " (" + totalFlagged.size() + " keys). No action taken.");
-            return;
-        }
-
         if (!session.isConfirmation()) {
             // Flagged during first pass, schedule confirmation pass after config delay
             long delayTicks = (plugin.getLovelyConfig().confirmationDelayMs * 20L) / 1000L;
