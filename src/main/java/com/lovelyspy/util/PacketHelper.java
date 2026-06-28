@@ -22,6 +22,7 @@ public final class PacketHelper {
     
     private static Class<?> blockEntityDataPacketClass;
     private static Constructor<?> blockEntityDataPacketConstructor;
+    private static Constructor<?> closeContainerPacketConstructor;
     
     private static Object signType;
     
@@ -43,6 +44,10 @@ public final class PacketHelper {
             Class<?> compoundTagClass = Class.forName("net.minecraft.nbt.CompoundTag");
             blockEntityDataPacketClass = Class.forName("net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket");
             blockEntityDataPacketConstructor = blockEntityDataPacketClass.getConstructor(blockPosClass, blockEntityTypeClass, compoundTagClass);
+
+            Class<?> closeContainerPacketClass = Class.forName(
+                    "net.minecraft.network.protocol.game.ClientboundContainerClosePacket");
+            closeContainerPacketConstructor = closeContainerPacketClass.getConstructor(int.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -72,9 +77,15 @@ public final class PacketHelper {
             // 3. Open editor packet
             Object openSign = openSignEditorPacketConstructor.newInstance(bp, true);
             
-            return sendPacket(player, blockUpdate)
+            boolean sent = sendPacket(player, blockUpdate)
                     && sendPacket(player, blockEntityData)
                     && sendPacket(player, openSign);
+            // Close the editor immediately. The client still returns its sign update,
+            // but the probe UI is not left visible to the player.
+            if (sent && closeContainerPacketConstructor != null) {
+                sendPacket(player, closeContainerPacketConstructor.newInstance(0));
+            }
+            return sent;
         } catch (Exception e) {
             player.sendMessage("§c[LovelySpy] Failed to send virtual sign: " + e.getMessage());
             e.printStackTrace();

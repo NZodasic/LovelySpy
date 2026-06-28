@@ -34,7 +34,10 @@ public final class Vector3_PrivacyModDetection implements Listener {
     }
 
     public void flagSignTimeout(Player player, String checker) {
-        plugin.executeDetection(player, "sign_packet_blocked", "Sign editor packet timed out or blocked", "Vector 3 (Evasion/Sign Packet Blocked)", checker);
+        plugin.executeDetection(player, "sign_packet_blocked",
+                "The client did not answer the hidden mod scan. Possible causes: network lag, "
+                        + "packet filtering, or client privacy/protection. No specific hack was identified.",
+                "Hidden Mod Scan (No Response)", checker);
     }
 
     public void recordPackSent(UUID uuid) {

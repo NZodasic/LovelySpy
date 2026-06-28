@@ -10,16 +10,18 @@ public class Config {
 
     public int probeDelayTicks;
     public int confirmationDelayMs;
+    public int probeTimeoutTicks;
     public String canaryKey;
     public Map<String, ModEntry> modEntries = new HashMap<>();
     public List<String> knownCheatBrands;
     public List<String> knownCheatChannels;
     public List<String> legitimateBrands;
     public String logFile;
-    public boolean discordWebhookEnabled;
-    public String discordWebhookUrl;
-    public int discordWebhookEmbedColor;
-    public String discordWebhookMessage;
+    public boolean discordBotEnabled;
+    public String discordBotToken;
+    public String discordBotChannelId;
+    public int discordBotEmbedColor;
+    public String discordBotMessage;
 
     // Global action toggles
     public boolean actionKickEnabled;
@@ -45,15 +47,17 @@ public class Config {
     public void save() {
         yaml.set("probe_delay_ticks", probeDelayTicks);
         yaml.set("confirmation_delay_ms", confirmationDelayMs);
+        yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("canary_key", canaryKey);
         yaml.set("known_cheat_brands", knownCheatBrands);
         yaml.set("known_cheat_channels", knownCheatChannels);
         yaml.set("legitimate_brands", legitimateBrands);
         yaml.set("log_file", logFile);
-        yaml.set("discord-webhook.enabled", discordWebhookEnabled);
-        yaml.set("discord-webhook.webhook-url", discordWebhookUrl);
-        yaml.set("discord-webhook.embed-color", discordWebhookEmbedColor);
-        yaml.set("discord-webhook.message", discordWebhookMessage);
+        yaml.set("discord-bot.enabled", discordBotEnabled);
+        yaml.set("discord-bot.bot-token", discordBotToken);
+        yaml.set("discord-bot.channel-id", discordBotChannelId);
+        yaml.set("discord-bot.embed-color", discordBotEmbedColor);
+        yaml.set("discord-bot.message", discordBotMessage);
         
         yaml.set("actions.KICK", actionKickEnabled);
         yaml.set("actions.BAN", actionBanEnabled);
@@ -84,15 +88,26 @@ public class Config {
     private void parse() {
         probeDelayTicks = yaml.getInt("probe_delay_ticks", 15);
         confirmationDelayMs = yaml.getInt("confirmation_delay_ms", 300);
+        probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 60));
         canaryKey = yaml.getString("canary_key", "key.forward");
         knownCheatBrands = yaml.getStringList("known_cheat_brands");
         knownCheatChannels = yaml.getStringList("known_cheat_channels");
-        legitimateBrands = yaml.getStringList("legitimate_brands");
+        legitimateBrands = new ArrayList<>(yaml.getStringList("legitimate_brands"));
+        // Older configs used Lunar's loader name, while current Lunar versions
+        // identify themselves as "lunarclient:<version>,<loader>".
+        boolean hasLunarLoader = legitimateBrands.stream()
+                .anyMatch(brand -> brand.equalsIgnoreCase("lunarloader"));
+        boolean hasLunarClient = legitimateBrands.stream()
+                .anyMatch(brand -> brand.equalsIgnoreCase("lunarclient"));
+        if (hasLunarLoader && !hasLunarClient) {
+            legitimateBrands.add("lunarclient");
+        }
         logFile = yaml.getString("log_file", "plugins/LovelySpy/logs.json");
-        discordWebhookEnabled = yaml.getBoolean("discord-webhook.enabled", false);
-        discordWebhookUrl = yaml.getString("discord-webhook.webhook-url", "https://discord.com/api/webhooks/CHANGE_ME");
-        discordWebhookEmbedColor = yaml.getInt("discord-webhook.embed-color", 16776960);
-        discordWebhookMessage = yaml.getString("discord-webhook.message",
+        discordBotEnabled = yaml.getBoolean("discord-bot.enabled", false);
+        discordBotToken = yaml.getString("discord-bot.bot-token", "CHANGE_ME");
+        discordBotChannelId = yaml.getString("discord-bot.channel-id", "CHANGE_ME");
+        discordBotEmbedColor = yaml.getInt("discord-bot.embed-color", 16776960);
+        discordBotMessage = yaml.getString("discord-bot.message",
                 "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n**Hacks checked:** &hacks&\n**Results:**\n&results&");
 
         actionKickEnabled = yaml.getBoolean("actions.KICK", true);

@@ -29,7 +29,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private Vector4_ResourcePackAltDetection vector4;
     private Commands commands;
     private ConfigDialogManager configDialogManager;
-    private DiscordWebhookNotifier discordWebhookNotifier;
+    private DiscordBotNotifier discordBotNotifier;
 
     @Override
     public void onEnable() {
@@ -45,7 +45,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         offenseManager = new OffenseManager(this);
         offenseManager.init();
 
-        discordWebhookNotifier = new DiscordWebhookNotifier(this);
+        discordBotNotifier = new DiscordBotNotifier(this);
 
         vector1 = new Vector1_TranslationFingerprint(this);
         vector2 = new Vector2_BrandChannelAnalysis(this);
@@ -104,6 +104,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         ejectPlayer(player);
         vector1.handleQuit(player.getUniqueId());
+        vector2.removeProfile(player.getUniqueId());
     }
 
     private void injectPlayer(Player player) {
@@ -154,20 +155,22 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             }
         }
 
-        String confidence = "HIGH";
-        if (action.equalsIgnoreCase("BAN")) confidence = "CRITICAL";
+        String confidence;
+        if (key.equals("sign_packet_blocked")) confidence = "INCONCLUSIVE";
+        else if (vectorName.contains("Translation Fingerprinting")) confidence = "HIGH";
+        else if (action.equalsIgnoreCase("BAN")) confidence = "CRITICAL";
         else if (action.equalsIgnoreCase("KICK")) confidence = "HIGH";
         else if (action.equalsIgnoreCase("FLAG")) confidence = "MEDIUM";
-        else if (action.equalsIgnoreCase("SHADOW")) confidence = "LOW";
+        else confidence = "LOW";
 
         // Log result
-        loggerService.log(player.getUniqueId(), player.getName(), 
+        Logger.LogEntry logEntry = loggerService.log(player.getUniqueId(), player.getName(),
                 List.of(key), Map.of(key, responseVal), 
                 List.of(vectorName), confidence, action);
 
         // Broadcast alert
-        String alertMsg = "§c[LovelySpy] §e" + player.getName() + " §7triggered §b" + vectorName + 
-                " §7(§f" + key + " §7-> §f" + responseVal + "§7) §6[" + confidence + "]";
+        String alertMsg = buildFriendlyAlert(player, key, responseVal, vectorName,
+                confidence, action, matched, logEntry.caseId);
         
         Bukkit.getConsoleSender().sendMessage(alertMsg);
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -176,7 +179,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             }
         }
 
-        discordWebhookNotifier.sendDetection(player, checker, matched, key, responseVal, vectorName, confidence, action);
+        discordBotNotifier.sendDetection(player, checker, matched, key, responseVal, vectorName, confidence, action);
 
         // Execute action on primary thread
         String finalAction = action;
@@ -223,6 +226,77 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                     break;
             }
         });
+    }
+
+    private String buildFriendlyAlert(Player player, String key, String evidence,
+                                      String vectorName, String confidence, String action,
+                                      Config.ModEntry matched, long caseId) {
+        String prefix = "§c[LovelySpy] §7CASE #" + caseId + " §8| §fPlayer: §e"
+                + player.getName() + " §7(UUID: " + player.getUniqueId() + ")\n";
+        if (key.equals("sign_packet_blocked")) {
+            ClientProfile profile = vector2.getProfile(player);
+            String loaders = profile.loaders().isEmpty()
+                    ? "None detected" : String.join(", ", profile.loaders());
+            int today = loggerService.countToday(player.getUniqueId(), "INCONCLUSIVE");
+            String watch = today >= 3
+                    ? "\n§7→ §cWATCHLIST: " + today + " inconclusive scans today—investigate manually."
+                    : "\n§7→ §8History: " + today + " inconclusive scan" + (today == 1 ? "" : "s") + " today.";
+            return prefix
+                    + "§7→ §6STATUS: SCAN INCONCLUSIVE §8[INFO]\n"
+                    + "§7→ §fENVIRONMENT: Client: §b" + profile.client()
+                    + " §7| Loader: §b" + loaders + "\n"
+                    + "§7→ §fREASON: No response from hidden mod scan (lag, packet filter, or client protection).\n"
+                    + "§7→ §aSYSTEM ACTION: None—no hack was identified.\n"
+                    + "§7→ §eSTAFF ADVICE: Do not punish. Manually spectate if gameplay is suspicious."
+                    + watch;
+        }
+        if (vectorName.contains("Translation Fingerprinting") && matched != null) {
+            return prefix
+                    + "§7→ §cSTATUS: MOD DETECTED §8[" + confidence + "]\n"
+                    + "§7→ §fEVIDENCE: §c" + humanizeIdentifier(matched.name)
+                    + " §7(confirmed x2 via translation delta)\n"
+                    + "§7→ §fSYSTEM ACTION: §b" + describeSystemAction(action) + "\n"
+                    + "§7→ §eSTAFF ADVICE: " + staffAdvice(action);
+        }
+        return prefix
+                + "§7→ §cSTATUS: DETECTION §8[" + confidence + "]\n"
+                + "§7→ §fEVIDENCE: §c" + evidence + "\n"
+                + "§7→ §fSYSTEM ACTION: §b" + describeSystemAction(action) + "\n"
+                + "§7→ §eSTAFF ADVICE: " + staffAdvice(action);
+    }
+
+    private String describeSystemAction(String action) {
+        return switch (action.toUpperCase()) {
+            case "KICK" -> config.actionKickEnabled ? "Auto-kick scheduled" : "None (auto-kick disabled)";
+            case "BAN" -> config.actionBanEnabled ? "Automatic temporary ban scheduled" : "None (auto-ban disabled)";
+            case "FLAG" -> config.actionFlagEnabled ? "Logged and staff alerted" : "Logged (staff flag disabled)";
+            case "SHADOW" -> config.actionShadowEnabled ? "Logged for monitoring" : "Logged only";
+            default -> "Logged only";
+        };
+    }
+
+    private String staffAdvice(String action) {
+        return switch (action.toUpperCase()) {
+            case "BAN" -> config.actionBanEnabled
+                    ? "No immediate action needed; review the case log if appealed."
+                    : "Review evidence and apply server policy manually.";
+            case "KICK" -> config.actionKickEnabled
+                    ? "Monitor rejoin behavior; escalate only on repeated confirmed detections."
+                    : "Review evidence before taking manual action.";
+            default -> "Review the case and spectate before applying punishment.";
+        };
+    }
+
+    private String humanizeIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) return "Unknown mod";
+        String[] words = identifier.replace('-', '_').split("_");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (word.isBlank()) continue;
+            if (!result.isEmpty()) result.append(' ');
+            result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return result.toString();
     }
 
     // Packet interceptor logic using Netty ChannelDuplexHandler

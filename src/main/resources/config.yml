@@ -2,6 +2,7 @@
 
 probe_delay_ticks: 15          # Ticks after join before first probe
 confirmation_delay_ms: 300     # Time between probe and confirmation pass
+probe_timeout_ticks: 60        # No-response threshold (60 ticks = 3 seconds)
 canary_key: "key.forward"      # Canary key to test translation shield
 
 mods:
@@ -151,10 +152,14 @@ known_cheat_channels:
 # Whitelist of legitimate client brands
 legitimate_brands:
   - "lunarloader"
+  - "lunarclient"
   - "laby4"
   - "badlion"
   - "feather"
   - "essential"
+  - "fabric"
+  - "forge"
+  - "neoforge"
   - "vanilla"
 
 # Actions
@@ -167,9 +172,12 @@ actions:
 # Logging
 log_file: "plugins/LovelySpy/logs.json"
 
-# Discord webhook alerts
-discord-webhook:
+# Discord bot alerts
+# The bot must be in the server and have View Channel, Send Messages,
+# and Embed Links permissions in the configured channel.
+discord-bot:
   enabled: false
-  webhook-url: "https://discord.com/api/webhooks/CHANGE_ME"
+  bot-token: "CHANGE_ME"
+  channel-id: "CHANGE_ME"
   embed-color: 16776960
   message: "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n**Hacks checked:** &hacks&\n**Results:**\n&results&"

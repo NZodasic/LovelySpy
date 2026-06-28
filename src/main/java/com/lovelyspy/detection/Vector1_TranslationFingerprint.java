@@ -99,10 +99,11 @@ public final class Vector1_TranslationFingerprint {
         ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest, remainingKeys,
                 flaggedKeys, isConfirmation, checker);
         
-        // Timeout task: if client does not respond in 5 seconds (100 ticks)
+        // A timeout is inconclusive: lag, packet filtering, or client protection can
+        // all prevent a response. It must never be presented as a named hack.
         SchedulerHelper.LovelyTask timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> {
             handleTimeout(player.getUniqueId());
-        }, 100L);
+        }, plugin.getLovelyConfig().probeTimeoutTicks);
         session.setTimeoutTask(timeoutTask);
 
         sessions.put(player.getUniqueId(), session);

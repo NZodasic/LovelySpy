@@ -25,3 +25,9 @@ permissions:
   lovelyspy.bypass:
     description: Exempt from all probes.
     default: false
+  lovelyspy.admin:
+    description: Open the LovelySpy configuration interface.
+    default: op
+  lovelyspy.reset:
+    description: Reset player offense records.
+    default: op

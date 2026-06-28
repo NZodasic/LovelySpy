@@ -16,7 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-public final class DiscordWebhookNotifier {
+public final class DiscordBotNotifier {
+    private static final String DISCORD_API_BASE_URL = "https://discord.com/api/v10";
     private static final int DISCORD_EMBED_DESCRIPTION_LIMIT = 4096;
     private static final long CONFIG_WARNING_COOLDOWN_MS = 60_000L;
 
@@ -27,19 +28,20 @@ public final class DiscordWebhookNotifier {
             .build();
     private long lastConfigWarningAt;
 
-    public DiscordWebhookNotifier(LovelySpyPlugin plugin) {
+    public DiscordBotNotifier(LovelySpyPlugin plugin) {
         this.plugin = plugin;
     }
 
     public void sendDetection(Player player, String checker, Config.ModEntry matched, String key,
                                String responseVal, String vectorName, String confidence, String action) {
         Config config = plugin.getLovelyConfig();
-        if (!config.discordWebhookEnabled) {
+        if (!config.discordBotEnabled) {
             return;
         }
 
-        String webhookUrl = normalizeWebhookUrl(config.discordWebhookUrl);
-        if (!isUsableWebhookUrl(webhookUrl)) {
+        String botToken = normalizeBotToken(config.discordBotToken);
+        String channelId = normalize(config.discordBotChannelId);
+        if (!isUsableBotToken(botToken) || !isUsableChannelId(channelId)) {
             warnInvalidConfig();
             return;
         }
@@ -52,7 +54,7 @@ public final class DiscordWebhookNotifier {
                 + "\nConfidence: " + confidence
                 + "\nAction: " + action;
 
-        String description = config.discordWebhookMessage
+        String description = config.discordBotMessage
                 .replace("&name&", playerName)
                 .replace("&checker&", checkerName)
                 .replace("&reason&", reason)
@@ -62,7 +64,7 @@ public final class DiscordWebhookNotifier {
         Map<String, Object> embed = new LinkedHashMap<>();
         embed.put("title", "LovelySpy Detection");
         embed.put("description", truncate(stripSectionColors(description), DISCORD_EMBED_DESCRIPTION_LIMIT));
-        embed.put("color", clampDiscordColor(config.discordWebhookEmbedColor));
+        embed.put("color", clampDiscordColor(config.discordBotEmbedColor));
         embed.put("timestamp", Instant.now().toString());
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -70,42 +72,47 @@ public final class DiscordWebhookNotifier {
         payload.put("allowed_mentions", Map.of("parse", List.of()));
 
         String body = gson.toJson(payload);
-        SchedulerHelper.runTaskAsynchronously(plugin, () -> postWebhook(webhookUrl, body));
+        SchedulerHelper.runTaskAsynchronously(plugin, () -> postMessage(botToken, channelId, body));
     }
 
-    private void postWebhook(String webhookUrl, String body) {
+    private void postMessage(String botToken, String channelId, String body) {
         try {
-            HttpRequest request = HttpRequest.newBuilder(URI.create(webhookUrl))
+            URI endpoint = URI.create(DISCORD_API_BASE_URL + "/channels/" + channelId + "/messages");
+            HttpRequest request = HttpRequest.newBuilder(endpoint)
                     .timeout(Duration.ofSeconds(10))
+                    .header("Authorization", "Bot " + botToken)
                     .header("Content-Type", "application/json")
+                    .header("User-Agent", "DiscordBot (LovelySpy, 1.0.0)")
                     .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8))
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             int status = response.statusCode();
             if (status < 200 || status >= 300) {
-                plugin.getLogger().warning("Discord webhook returned HTTP " + status + ".");
+                plugin.getLogger().warning("Discord bot message returned HTTP " + status + ".");
             }
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to send Discord webhook: " + e.getMessage());
+            plugin.getLogger().warning("Failed to send Discord bot message: " + e.getMessage());
         }
     }
 
-    private String normalizeWebhookUrl(String webhookUrl) {
-        if (webhookUrl == null) {
-            return "";
-        }
-
-        String trimmed = webhookUrl.trim();
-        if (trimmed.startsWith("[") && trimmed.contains("](") && trimmed.endsWith(")")) {
-            int start = trimmed.indexOf("](") + 2;
-            return trimmed.substring(start, trimmed.length() - 1).trim();
-        }
-        return trimmed;
+    private String normalize(String value) {
+        return value == null ? "" : value.trim();
     }
 
-    private boolean isUsableWebhookUrl(String webhookUrl) {
-        return webhookUrl.startsWith("https://discord.com/api/webhooks/")
-                && !webhookUrl.contains("CHANGE_ME");
+    private String normalizeBotToken(String botToken) {
+        String normalized = normalize(botToken);
+        if (normalized.regionMatches(true, 0, "Bot ", 0, 4)) {
+            return normalized.substring(4).trim();
+        }
+        return normalized;
+    }
+
+    private boolean isUsableBotToken(String botToken) {
+        return !botToken.isBlank() && !botToken.contains("CHANGE_ME");
+    }
+
+    private boolean isUsableChannelId(String channelId) {
+        return channelId.matches("\\d{17,20}") && !channelId.contains("CHANGE_ME");
     }
 
     private int clampDiscordColor(int color) {
@@ -154,6 +161,7 @@ public final class DiscordWebhookNotifier {
             return;
         }
         lastConfigWarningAt = now;
-        plugin.getLogger().warning("Discord webhook is enabled, but webhook-url is missing or still set to CHANGE_ME.");
+        plugin.getLogger().warning(
+                "Discord bot alerts are enabled, but bot-token or channel-id is missing or invalid.");
     }
 }

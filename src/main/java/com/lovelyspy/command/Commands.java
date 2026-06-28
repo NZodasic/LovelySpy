@@ -1,6 +1,7 @@
 package com.lovelyspy.command;
 
 import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.detection.ClientProfile;
 import com.lovelyspy.util.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -76,6 +77,14 @@ public final class Commands implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 showPlayerInfo(sender, infoTarget);
+                return true;
+
+            case "list":
+                if (!sender.hasPermission("lovelyspy.check")) {
+                    sender.sendMessage("§cYou do not have permission to view client profiles.");
+                    return true;
+                }
+                showPlayerList(sender);
                 return true;
 
             case "history":
@@ -170,6 +179,7 @@ public final class Commands implements CommandExecutor, TabCompleter {
         sender.sendMessage("§6§l=== LovelySpy Commands ===");
         sender.sendMessage("§e/lovelyspy check <player> §7- Manually probe a player");
         sender.sendMessage("§e/lovelyspy info <player> §7- View player client info");
+        sender.sendMessage("§e/lovelyspy list §7- List detected clients and loaders");
         sender.sendMessage("§e/lovelyspy history <player> §7- View player check history");
         sender.sendMessage("§e/lovelyspy offenses <player> §7- View player offense count");
         sender.sendMessage("§e/lovelyspy resetoffense <player> §7- Reset player offense count");
@@ -179,14 +189,17 @@ public final class Commands implements CommandExecutor, TabCompleter {
     }
 
     private void showPlayerInfo(CommandSender sender, Player target) {
-        String brand = target.getClientBrandName();
-        if (brand == null) brand = "unknown";
-
-        Set<String> channels = target.getListeningPluginChannels();
+        ClientProfile profile = plugin.getVector2().getProfile(target);
+        Set<String> channels = profile.channels();
         sender.sendMessage("§6§l=== LovelySpy Profile: " + target.getName() + " ===");
         sender.sendMessage("§eUUID: §7" + target.getUniqueId());
         sender.sendMessage("§eIP: §7" + (target.getAddress() != null ? target.getAddress().getAddress().getHostAddress() : "unknown"));
-        sender.sendMessage("§eClient Brand: §b" + brand);
+        sender.sendMessage("§ePlatform: §b" + profile.platform()
+                + (profile.bedrockSource() != null ? " §7(" + profile.bedrockSource() + ")" : ""));
+        sender.sendMessage("§eDetected Client: §b" + profile.client());
+        sender.sendMessage("§eRaw Brand: §7" + profile.brand());
+        sender.sendMessage("§eLoaders: §b" + formatValues(profile.loaders()));
+        sender.sendMessage("§eDetected Mods: §b" + formatValues(profile.mods()));
         sender.sendMessage("§eRegistered Channels (" + channels.size() + "):");
         if (channels.isEmpty()) {
             sender.sendMessage("  - None");
@@ -195,6 +208,25 @@ public final class Commands implements CommandExecutor, TabCompleter {
                 sender.sendMessage("  - " + ch);
             }
         }
+    }
+
+    private void showPlayerList(CommandSender sender) {
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        players.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+        sender.sendMessage("§6§l=== LovelySpy Online Client Profiles (" + players.size() + ") ===");
+        for (Player player : players) {
+            ClientProfile profile = plugin.getVector2().getProfile(player);
+            String loaders = profile.loaders().isEmpty()
+                    ? "" : " §7[" + String.join(", ", profile.loaders()) + "]";
+            String mods = profile.mods().isEmpty()
+                    ? "" : " §6⚠ " + String.join(", ", profile.mods());
+            sender.sendMessage("§e" + player.getName() + " §7— §b"
+                    + profile.client() + loaders + mods);
+        }
+    }
+
+    private String formatValues(Set<String> values) {
+        return values.isEmpty() ? "None detected" : String.join(", ", values);
     }
 
     private void showHistory(CommandSender sender, String query) {
@@ -209,7 +241,8 @@ public final class Commands implements CommandExecutor, TabCompleter {
         for (int i = Math.max(0, logs.size() - 5); i < logs.size(); i++) {
             Logger.LogEntry log = logs.get(i);
             String date = sdf.format(new Date(log.timestamp));
-            sender.sendMessage("§e[" + date + "] §fConfidence: " + getConfidenceColor(log.confidence) + log.confidence + " §fAction: §7" + log.actionTaken);
+            sender.sendMessage("§e[Case #" + log.caseId + " · " + date + "] §fConfidence: "
+                    + getConfidenceColor(log.confidence) + log.confidence + " §fSystem Action: §7" + log.actionTaken);
             sender.sendMessage("  §7Vectors: " + String.join(", ", log.vectorsTriggered));
             if (!log.responses.isEmpty()) {
                 sender.sendMessage("  §7Responses: " + log.responses);
@@ -235,6 +268,7 @@ public final class Commands implements CommandExecutor, TabCompleter {
             if (sender.hasPermission("lovelyspy.check")) {
                 subs.add("check");
                 subs.add("info");
+                subs.add("list");
                 subs.add("history");
                 subs.add("offenses");
             }

@@ -34,6 +34,7 @@ All administrative commands require permission. Below is the command index:
 | `/lovelyspy gui` / `config` / `dialog` | Opens the interactive Dialog Configuration Menu | `lovelyspy.admin` | Op |
 | `/lovelyspy check <player>` | Manually runs a translation probe on a player | `lovelyspy.check` | Op |
 | `/lovelyspy info <player>` | Inspects client brand name and listening channels | `lovelyspy.check` | Op |
+| `/lovelyspy list` | Lists online players with detected clients, loaders, and mods | `lovelyspy.check` | Op |
 | `/lovelyspy offenses <player>` | Checks the current offense count for a player | `lovelyspy.check` | Op |
 | `/lovelyspy resetoffense <player>` | Clears the recorded offenses back to 0 | `lovelyspy.reset` | Op |
 | `/lovelyspy history <player>` | Displays the recent check logs of a player | `lovelyspy.check` | Op |

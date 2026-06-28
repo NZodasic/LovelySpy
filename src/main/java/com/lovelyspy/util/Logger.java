@@ -5,11 +5,13 @@ import com.lovelyspy.LovelySpyPlugin;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class Logger {
     private final LovelySpyPlugin plugin;
     private final Gson gson = new Gson();
     private final List<LogEntry> inMemoryHistory = Collections.synchronizedList(new ArrayList<>());
+    private final AtomicLong nextCaseId = new AtomicLong(1);
 
     public Logger(LovelySpyPlugin plugin) {
         this.plugin = plugin;
@@ -19,10 +21,11 @@ public final class Logger {
         loadHistoryFromFile();
     }
 
-    public void log(UUID uuid, String username, List<String> keysTested, Map<String, String> responses,
-                    List<String> vectorsTriggered, String confidence, String actionTaken) {
+    public LogEntry log(UUID uuid, String username, List<String> keysTested, Map<String, String> responses,
+                        List<String> vectorsTriggered, String confidence, String actionTaken) {
         
         LogEntry entry = new LogEntry();
+        entry.caseId = nextCaseId.getAndIncrement();
         entry.uuid = uuid.toString();
         entry.username = username;
         entry.timestamp = System.currentTimeMillis();
@@ -47,6 +50,26 @@ public final class Logger {
                 plugin.getLogger().warning("Failed to write log entry: " + e.getMessage());
             }
         });
+        return entry;
+    }
+
+    public int countToday(UUID uuid, String confidence) {
+        Calendar start = Calendar.getInstance();
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        int count = 0;
+        synchronized (inMemoryHistory) {
+            for (LogEntry entry : inMemoryHistory) {
+                if (entry.timestamp >= start.getTimeInMillis()
+                        && entry.uuid.equalsIgnoreCase(uuid.toString())
+                        && entry.confidence.equalsIgnoreCase(confidence)) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     public List<LogEntry> getHistory(String nameOrUuid) {
@@ -75,6 +98,7 @@ public final class Logger {
 
     private void loadHistoryFromFile() {
         inMemoryHistory.clear();
+        long highestCaseId = 0;
         File file = new File(plugin.getDataFolder(), "logs.json");
         if (!file.exists()) return;
 
@@ -88,15 +112,18 @@ public final class Logger {
                     LogEntry entry = gson.fromJson(line, LogEntry.class);
                     if (entry != null) {
                         inMemoryHistory.add(entry);
+                        highestCaseId = Math.max(highestCaseId, entry.caseId);
                     }
                 } catch (Exception ignored) {}
             }
         } catch (IOException e) {
             plugin.getLogger().warning("Failed to load logs.json: " + e.getMessage());
         }
+        nextCaseId.set(highestCaseId + 1);
     }
 
     public static class LogEntry {
+        public long caseId;
         public String uuid;
         public String username;
         public long timestamp;
