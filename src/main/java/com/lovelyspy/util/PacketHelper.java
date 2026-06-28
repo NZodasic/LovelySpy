@@ -202,7 +202,7 @@ public final class PacketHelper {
         return root;
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings("unchecked")
     private static void addToNbtList(Object listTag, Object tag) throws Exception {
         if (listTag instanceof List list) {
             list.add(tag);
