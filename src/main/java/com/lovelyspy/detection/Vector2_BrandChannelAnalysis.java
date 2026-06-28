@@ -125,8 +125,7 @@ public final class Vector2_BrandChannelAnalysis implements Listener {
             String details = brand.substring("lunarclient:".length());
             String[] parts = details.split(",", 2);
             String version = parts[0].replaceFirst("^[vV]", "");
-            String loader = parts.length > 1 ? " / " + capitalize(parts[1]) : "";
-            return "Lunar Client " + version + loader + " [" + brand + "]";
+            return "Lunar Client " + version;
         }
         return brand;
     }
@@ -136,11 +135,6 @@ public final class Vector2_BrandChannelAnalysis implements Listener {
             return "Lunar Apollo services [" + channel + "]";
         }
         return channel;
-    }
-
-    private String capitalize(String value) {
-        if (value.isBlank()) return value;
-        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     public ClientProfile getProfile(Player player) {

@@ -33,7 +33,8 @@ public final class DiscordBotNotifier {
     }
 
     public void sendDetection(Player player, String checker, Config.ModEntry matched, String key,
-                               String responseVal, String vectorName, String confidence, String action) {
+                               String responseVal, String vectorName, String confidence, String action,
+                               long caseId, String staffSummary) {
         Config config = plugin.getLovelyConfig();
         if (!config.discordBotEnabled) {
             return;
@@ -56,13 +57,15 @@ public final class DiscordBotNotifier {
 
         String description = config.discordBotMessage
                 .replace("&name&", playerName)
+                .replace("&case&", Long.toString(caseId))
+                .replace("&summary&", stripSectionColors(staffSummary))
                 .replace("&checker&", checkerName)
                 .replace("&reason&", reason)
                 .replace("&hacks&", hacks)
                 .replace("&results&", results);
 
         Map<String, Object> embed = new LinkedHashMap<>();
-        embed.put("title", "LovelySpy Detection");
+        embed.put("title", "LovelySpy Case #" + caseId);
         embed.put("description", truncate(stripSectionColors(description), DISCORD_EMBED_DESCRIPTION_LIMIT));
         embed.put("color", clampDiscordColor(config.discordBotEmbedColor));
         embed.put("timestamp", Instant.now().toString());

@@ -112,8 +112,14 @@ public class Config {
         discordBotToken = yaml.getString("discord-bot.bot-token", "CHANGE_ME");
         discordBotChannelId = yaml.getString("discord-bot.channel-id", "CHANGE_ME");
         discordBotEmbedColor = yaml.getInt("discord-bot.embed-color", 16776960);
+        String legacyDiscordMessage =
+                "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n"
+                        + "**Hacks checked:** &hacks&\n**Results:**\n&results&";
         discordBotMessage = yaml.getString("discord-bot.message",
-                "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n**Hacks checked:** &hacks&\n**Results:**\n&results&");
+                "&summary&");
+        if (discordBotMessage.equals(legacyDiscordMessage)) {
+            discordBotMessage = "&summary&";
+        }
 
         actionKickEnabled = yaml.getBoolean("actions.KICK", true);
         actionBanEnabled = yaml.getBoolean("actions.BAN", true);

@@ -110,7 +110,17 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private void injectPlayer(Player player) {
         io.netty.channel.Channel channel = PacketHelper.getChannel(player);
         if (channel != null && channel.pipeline().get("lovelyspy_handler") == null) {
-            channel.pipeline().addBefore("packet_handler", "lovelyspy_handler", new PlayerPacketHandler(player));
+            String insertionPoint = "packet_handler";
+            for (String name : channel.pipeline().names()) {
+                io.netty.channel.ChannelHandler handler = channel.pipeline().get(name);
+                if (handler != null && handler.getClass().getName().toLowerCase(Locale.ROOT)
+                        .contains("exploitfixer")) {
+                    insertionPoint = name;
+                    break;
+                }
+            }
+            channel.pipeline().addBefore(insertionPoint, "lovelyspy_handler",
+                    new PlayerPacketHandler(player));
         }
     }
 
@@ -179,7 +189,8 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             }
         }
 
-        discordBotNotifier.sendDetection(player, checker, matched, key, responseVal, vectorName, confidence, action);
+        discordBotNotifier.sendDetection(player, checker, matched, key, responseVal,
+                vectorName, confidence, action, logEntry.caseId, alertMsg);
 
         // Execute action on primary thread
         String finalAction = action;
@@ -231,38 +242,36 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private String buildFriendlyAlert(Player player, String key, String evidence,
                                       String vectorName, String confidence, String action,
                                       Config.ModEntry matched, long caseId) {
-        String prefix = "§c[LovelySpy] §7CASE #" + caseId + " §8| §fPlayer: §e"
-                + player.getName() + " §7(UUID: " + player.getUniqueId() + ")\n";
         if (key.equals("sign_packet_blocked")) {
             ClientProfile profile = vector2.getProfile(player);
             String loaders = profile.loaders().isEmpty()
                     ? "None detected" : String.join(", ", profile.loaders());
             int today = loggerService.countToday(player.getUniqueId(), "INCONCLUSIVE");
-            String watch = today >= 3
-                    ? "\n§7→ §cWATCHLIST: " + today + " inconclusive scans today—investigate manually."
-                    : "\n§7→ §8History: " + today + " inconclusive scan" + (today == 1 ? "" : "s") + " today.";
-            return prefix
-                    + "§7→ §6STATUS: SCAN INCONCLUSIVE §8[INFO]\n"
-                    + "§7→ §fENVIRONMENT: Client: §b" + profile.client()
-                    + " §7| Loader: §b" + loaders + "\n"
-                    + "§7→ §fREASON: No response from hidden mod scan (lag, packet filter, or client protection).\n"
-                    + "§7→ §aSYSTEM ACTION: None—no hack was identified.\n"
-                    + "§7→ §eSTAFF ADVICE: Do not punish. Manually spectate if gameplay is suspicious."
-                    + watch;
+            String environment = compactEnvironment(profile.client(), loaders);
+            String watch = today >= 3 ? " §c| WATCHLIST: Review manually" : "";
+            return "§c[LovelySpy] §7#" + caseId + " §8| §e" + player.getName()
+                    + " §8| §6INCONCLUSIVE §8| §b" + environment
+                    + " §8| §7Scans today: " + today + watch;
         }
         if (vectorName.contains("Translation Fingerprinting") && matched != null) {
-            return prefix
-                    + "§7→ §cSTATUS: MOD DETECTED §8[" + confidence + "]\n"
-                    + "§7→ §fEVIDENCE: §c" + humanizeIdentifier(matched.name)
-                    + " §7(confirmed x2 via translation delta)\n"
-                    + "§7→ §fSYSTEM ACTION: §b" + describeSystemAction(action) + "\n"
-                    + "§7→ §eSTAFF ADVICE: " + staffAdvice(action);
+            return "§c[LovelySpy] §7#" + caseId + " §8| §e" + player.getName()
+                    + " §8| §cDETECTED: " + humanizeIdentifier(matched.name)
+                    + " §8| §c" + confidence + " §8| §b" + describeSystemAction(action);
         }
-        return prefix
-                + "§7→ §cSTATUS: DETECTION §8[" + confidence + "]\n"
-                + "§7→ §fEVIDENCE: §c" + evidence + "\n"
-                + "§7→ §fSYSTEM ACTION: §b" + describeSystemAction(action) + "\n"
-                + "§7→ §eSTAFF ADVICE: " + staffAdvice(action);
+        return "§c[LovelySpy] §7#" + caseId + " §8| §e" + player.getName()
+                + " §8| §cDETECTION: §f" + compactEvidence(evidence)
+                + " §8| §6" + confidence + " §8| §b" + describeSystemAction(action);
+    }
+
+    private String compactEnvironment(String client, String loaders) {
+        String cleanClient = client.replaceAll("\\s*\\[[^]]+]$", "")
+                .replace(" Client", "");
+        return loaders.equals("None detected") ? cleanClient : cleanClient + "/" + loaders;
+    }
+
+    private String compactEvidence(String evidence) {
+        int reason = evidence.indexOf(" | Reason:");
+        return reason >= 0 ? evidence.substring(0, reason) : evidence;
     }
 
     private String describeSystemAction(String action) {
@@ -272,18 +281,6 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             case "FLAG" -> config.actionFlagEnabled ? "Logged and staff alerted" : "Logged (staff flag disabled)";
             case "SHADOW" -> config.actionShadowEnabled ? "Logged for monitoring" : "Logged only";
             default -> "Logged only";
-        };
-    }
-
-    private String staffAdvice(String action) {
-        return switch (action.toUpperCase()) {
-            case "BAN" -> config.actionBanEnabled
-                    ? "No immediate action needed; review the case log if appealed."
-                    : "Review evidence and apply server policy manually.";
-            case "KICK" -> config.actionKickEnabled
-                    ? "Monitor rejoin behavior; escalate only on repeated confirmed detections."
-                    : "Review evidence before taking manual action.";
-            default -> "Review the case and spectate before applying punishment.";
         };
     }
 

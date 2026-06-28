@@ -181,4 +181,4 @@ discord-bot:
   bot-token: "CHANGE_ME"
   channel-id: "CHANGE_ME"
   embed-color: 16776960
-  message: "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n**Hacks checked:** &hacks&\n**Results:**\n&results&"
+  message: "&summary&"
