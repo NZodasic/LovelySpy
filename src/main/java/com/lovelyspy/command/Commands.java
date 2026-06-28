@@ -1,5 +1,7 @@
-package com.lovelyspy;
+package com.lovelyspy.command;
 
+import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.util.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -56,7 +58,7 @@ public final class Commands implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 sender.sendMessage("§e[LovelySpy] Starting manual probe on " + target.getName() + "...");
-                plugin.getVector1().probe(target);
+                plugin.getVector1().probe(target, sender.getName());
                 return true;
 
             case "info":
@@ -187,10 +189,10 @@ public final class Commands implements CommandExecutor, TabCompleter {
         sender.sendMessage("§eClient Brand: §b" + brand);
         sender.sendMessage("§eRegistered Channels (" + channels.size() + "):");
         if (channels.isEmpty()) {
-            sender.sendMessage(" §7- None");
+            sender.sendMessage("  - None");
         } else {
             for (String ch : channels) {
-                sender.sendMessage(" §7- " + ch);
+                sender.sendMessage("  - " + ch);
             }
         }
     }

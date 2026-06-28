@@ -166,3 +166,10 @@ actions:
 
 # Logging
 log_file: "plugins/LovelySpy/logs.json"
+
+# Discord webhook alerts
+discord-webhook:
+  enabled: false
+  webhook-url: "https://discord.com/api/webhooks/CHANGE_ME"
+  embed-color: 16776960
+  message: "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n**Hacks checked:** &hacks&\n**Results:**\n&results&"

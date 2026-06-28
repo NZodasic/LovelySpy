@@ -1,4 +1,4 @@
-package com.lovelyspy;
+package com.lovelyspy.util;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -6,6 +6,7 @@ import org.bukkit.block.data.BlockData;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.List;
 
 public final class PacketHelper {
@@ -56,7 +57,7 @@ public final class PacketHelper {
         return getStateMethod.invoke(blockData);
     }
 
-    public static void sendVirtualSign(Player player, org.bukkit.Location loc, List<String> lines) {
+    public static boolean sendVirtualSign(Player player, org.bukkit.Location loc, List<String> lines) {
         try {
             Object bp = createBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
             
@@ -71,12 +72,13 @@ public final class PacketHelper {
             // 3. Open editor packet
             Object openSign = openSignEditorPacketConstructor.newInstance(bp, true);
             
-            sendPacket(player, blockUpdate);
-            sendPacket(player, blockEntityData);
-            sendPacket(player, openSign);
+            return sendPacket(player, blockUpdate)
+                    && sendPacket(player, blockEntityData)
+                    && sendPacket(player, openSign);
         } catch (Exception e) {
             player.sendMessage("§c[LovelySpy] Failed to send virtual sign: " + e.getMessage());
             e.printStackTrace();
+            return false;
         }
     }
 
@@ -91,7 +93,7 @@ public final class PacketHelper {
         }
     }
 
-    public static void sendPacket(Player player, Object packet) {
+    public static boolean sendPacket(Player player, Object packet) {
         try {
             Object handle = player.getClass().getMethod("getHandle").invoke(player);
             Object conn = null;
@@ -107,7 +109,7 @@ public final class PacketHelper {
                     if (v != null) { conn = v; break; }
                 } catch (Exception ignored) {}
             }
-            if (conn == null) return;
+            if (conn == null) return false;
             
             Method send = null;
             for (Method m : conn.getClass().getMethods()) {
@@ -127,10 +129,12 @@ public final class PacketHelper {
             }
             if (send != null) {
                 send.invoke(conn, packet);
+                return true;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return false;
     }
 
     private static Object buildSignNbt(org.bukkit.Location loc, List<String> lines) throws Exception {
@@ -143,7 +147,6 @@ public final class PacketHelper {
         
         Method putString = compoundTagClass.getMethod("putString", String.class, String.class);
         Method put = compoundTagClass.getMethod("put", String.class, tagClass);
-        Method add = listTagClass.getMethod("add", tagClass);
         Method stringValueOf = stringTagClass.getMethod("valueOf", String.class);
 
         putString.invoke(root, "id", "minecraft:sign");
@@ -174,7 +177,7 @@ public final class PacketHelper {
                 json = "{\"text\":\"\"}";
             }
             Object stringTag = stringValueOf.invoke(null, json);
-            add.invoke(messagesList, stringTag);
+            addToNbtList(messagesList, stringTag);
         }
 
         put.invoke(frontText, "messages", messagesList);
@@ -188,7 +191,7 @@ public final class PacketHelper {
         Object backMessagesList = listTagClass.getConstructor().newInstance();
         for (int i = 0; i < 4; i++) {
             Object stringTag = stringValueOf.invoke(null, "{\"text\":\"\"}");
-            add.invoke(backMessagesList, stringTag);
+            addToNbtList(backMessagesList, stringTag);
         }
         put.invoke(backText, "messages", backMessagesList);
         putString.invoke(backText, "color", "black");
@@ -197,6 +200,38 @@ public final class PacketHelper {
         put.invoke(root, "back_text", backText);
 
         return root;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void addToNbtList(Object listTag, Object tag) throws Exception {
+        if (listTag instanceof List list) {
+            list.add(tag);
+            return;
+        }
+        if (listTag instanceof Collection collection) {
+            collection.add(tag);
+            return;
+        }
+
+        for (Method method : listTag.getClass().getMethods()) {
+            if (!method.getName().equals("add") || method.getParameterCount() != 1) {
+                continue;
+            }
+
+            Class<?> parameterType = method.getParameterTypes()[0];
+            if (!parameterType.isAssignableFrom(tag.getClass()) && !parameterType.equals(Object.class)) {
+                continue;
+            }
+
+            try {
+                method.invoke(listTag, tag);
+                return;
+            } catch (IllegalArgumentException ignored) {
+                // Try the next bridge/overload if Paper's reflection remapper rejected this signature.
+            }
+        }
+
+        throw new NoSuchMethodException(listTag.getClass().getName() + ".add(" + tag.getClass().getName() + ")");
     }
 
     public static io.netty.channel.Channel getChannel(Player player) {

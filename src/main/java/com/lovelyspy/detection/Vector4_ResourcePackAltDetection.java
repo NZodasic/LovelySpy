@@ -1,5 +1,6 @@
-package com.lovelyspy;
+package com.lovelyspy.detection;
 
+import com.lovelyspy.LovelySpyPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import java.util.*;

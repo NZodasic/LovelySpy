@@ -1,4 +1,4 @@
-package com.lovelyspy;
+package com.lovelyspy.util;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;

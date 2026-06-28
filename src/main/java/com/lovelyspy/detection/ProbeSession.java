@@ -1,5 +1,6 @@
-package com.lovelyspy;
+package com.lovelyspy.detection;
 
+import com.lovelyspy.util.SchedulerHelper;
 import org.bukkit.Location;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,7 @@ public final class ProbeSession {
     private final List<String> testedKeys;
     private final List<String> allPendingKeys;
     private final List<String> flaggedKeys;
+    private final String checker;
     private final long startTime;
     private final boolean isConfirmation;
     
@@ -19,12 +21,19 @@ public final class ProbeSession {
 
     public ProbeSession(UUID uuid, String name, Location location, List<String> testedKeys, 
                         List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation) {
+        this(uuid, name, location, testedKeys, allPendingKeys, flaggedKeys, isConfirmation, "Automatic");
+    }
+
+    public ProbeSession(UUID uuid, String name, Location location, List<String> testedKeys,
+                        List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation,
+                        String checker) {
         this.uuid = uuid;
         this.name = name;
         this.location = location;
         this.testedKeys = testedKeys;
         this.allPendingKeys = allPendingKeys != null ? allPendingKeys : new ArrayList<>();
         this.flaggedKeys = flaggedKeys != null ? flaggedKeys : new ArrayList<>();
+        this.checker = checker == null || checker.isBlank() ? "Automatic" : checker;
         this.startTime = System.currentTimeMillis();
         this.isConfirmation = isConfirmation;
     }
@@ -51,6 +60,10 @@ public final class ProbeSession {
 
     public List<String> getFlaggedKeys() {
         return flaggedKeys;
+    }
+
+    public String getChecker() {
+        return checker;
     }
 
     public long getStartTime() {

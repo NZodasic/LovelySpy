@@ -1,6 +1,7 @@
-package com.lovelyspy;
+package com.lovelyspy.util;
 
 import com.google.gson.Gson;
+import com.lovelyspy.LovelySpyPlugin;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;

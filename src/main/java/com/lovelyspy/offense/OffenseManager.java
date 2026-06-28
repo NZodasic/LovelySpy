@@ -1,7 +1,9 @@
-package com.lovelyspy;
+package com.lovelyspy.offense;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
+import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.util.SchedulerHelper;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;

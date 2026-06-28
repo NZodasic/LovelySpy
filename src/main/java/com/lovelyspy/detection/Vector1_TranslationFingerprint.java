@@ -1,5 +1,9 @@
-package com.lovelyspy;
+package com.lovelyspy.detection;
 
+import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.config.Config;
+import com.lovelyspy.util.PacketHelper;
+import com.lovelyspy.util.SchedulerHelper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -19,14 +23,23 @@ public final class Vector1_TranslationFingerprint {
     }
 
     public void probe(Player player) {
-        probe(player, false, null, null, null);
+        probe(player, "Automatic");
+    }
+
+    public void probe(Player player, String checker) {
+        probe(player, false, null, null, null, checker);
     }
 
     public void probe(Player player, boolean isConfirmation, List<String> specificKeys) {
-        probe(player, isConfirmation, specificKeys, null, null);
+        probe(player, isConfirmation, specificKeys, null, null, "Automatic");
     }
 
     public void probe(Player player, boolean isConfirmation, List<String> specificKeys, List<String> pendingKeys, List<String> flaggedKeys) {
+        probe(player, isConfirmation, specificKeys, pendingKeys, flaggedKeys, "Automatic");
+    }
+
+    public void probe(Player player, boolean isConfirmation, List<String> specificKeys, List<String> pendingKeys,
+                      List<String> flaggedKeys, String checker) {
         if (player.hasPermission("lovelyspy.bypass")) {
             return;
         }
@@ -75,10 +88,16 @@ public final class Vector1_TranslationFingerprint {
         // Line 4 is the canary key
         lines.add(plugin.getLovelyConfig().canaryKey);
 
-        // Send packets to the player
-        PacketHelper.sendVirtualSign(player, loc, lines);
+        // Send packets to the player. If LovelySpy cannot send the probe, do not create
+        // a session that later times out as a false sign_packet_blocked detection.
+        if (!PacketHelper.sendVirtualSign(player, loc, lines)) {
+            plugin.getLogger().warning("Skipped translation probe for " + player.getName()
+                    + " because the virtual sign packets could not be sent.");
+            return;
+        }
 
-        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest, remainingKeys, flaggedKeys, isConfirmation);
+        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest, remainingKeys,
+                flaggedKeys, isConfirmation, checker);
         
         // Timeout task: if client does not respond in 5 seconds (100 ticks)
         SchedulerHelper.LovelyTask timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> {
@@ -134,7 +153,7 @@ public final class Vector1_TranslationFingerprint {
 
         // If canary did not resolve, the translation shield is active (Vector 3)
         if (!canaryResolved) {
-            plugin.getVector3().flagTranslationShield(player);
+            plugin.getVector3().flagTranslationShield(player, session.getChecker());
         }
 
         // Accumulate flagged keys
@@ -143,7 +162,7 @@ public final class Vector1_TranslationFingerprint {
 
         // If there are more pending keys, continue to the next page
         if (!session.getAllPendingKeys().isEmpty()) {
-            probe(player, session.isConfirmation(), null, session.getAllPendingKeys(), totalFlagged);
+            probe(player, session.isConfirmation(), null, session.getAllPendingKeys(), totalFlagged, session.getChecker());
             return;
         }
 
@@ -164,13 +183,13 @@ public final class Vector1_TranslationFingerprint {
             SchedulerHelper.runTaskLater(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null && p.isOnline()) {
-                    probe(p, true, totalFlagged);
+                    probe(p, true, totalFlagged, null, null, session.getChecker());
                 }
             }, delayTicks);
         } else {
             // Confirmed! Trigger action
             for (String key : totalFlagged) {
-                plugin.executeDetection(player, key, responses.getOrDefault(key, "Resolved"), "Vector 1 (Translation Fingerprinting)");
+                plugin.executeDetection(player, key, responses.getOrDefault(key, "Resolved"), "Vector 1 (Translation Fingerprinting)", session.getChecker());
             }
         }
     }
@@ -186,7 +205,7 @@ public final class Vector1_TranslationFingerprint {
         PacketHelper.restoreVirtualSign(player, session.getLocation());
 
         // Timeout means the client blocked the packets or did not respond (Vector 3: Privacy/Evasion)
-        plugin.getVector3().flagSignTimeout(player);
+        plugin.getVector3().flagSignTimeout(player, session.getChecker());
     }
 
     public void handleQuit(UUID uuid) {

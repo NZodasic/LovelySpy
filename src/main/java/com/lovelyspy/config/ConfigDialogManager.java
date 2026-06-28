@@ -1,5 +1,6 @@
-package com.lovelyspy;
+package com.lovelyspy.config;
 
+import com.lovelyspy.LovelySpyPlugin;
 import io.papermc.paper.dialog.Dialog;
 import io.papermc.paper.registry.data.dialog.ActionButton;
 import io.papermc.paper.registry.data.dialog.DialogBase;

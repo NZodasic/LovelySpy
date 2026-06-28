@@ -1,5 +1,7 @@
-package com.lovelyspy;
+package com.lovelyspy.detection;
 
+import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.util.SchedulerHelper;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;

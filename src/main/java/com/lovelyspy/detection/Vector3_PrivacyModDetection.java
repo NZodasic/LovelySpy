@@ -1,5 +1,6 @@
-package com.lovelyspy;
+package com.lovelyspy.detection;
 
+import com.lovelyspy.LovelySpyPlugin;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -21,11 +22,19 @@ public final class Vector3_PrivacyModDetection implements Listener {
     }
 
     public void flagTranslationShield(Player player) {
-        plugin.executeDetection(player, "translation_shield", "Canary translation key did not resolve (shield active)", "Vector 3 (Translation Shield)");
+        flagTranslationShield(player, "Automatic");
+    }
+
+    public void flagTranslationShield(Player player, String checker) {
+        plugin.executeDetection(player, "translation_shield", "Canary translation key did not resolve (shield active)", "Vector 3 (Translation Shield)", checker);
     }
 
     public void flagSignTimeout(Player player) {
-        plugin.executeDetection(player, "sign_packet_blocked", "Sign editor packet timed out or blocked", "Vector 3 (Evasion/Sign Packet Blocked)");
+        flagSignTimeout(player, "Automatic");
+    }
+
+    public void flagSignTimeout(Player player, String checker) {
+        plugin.executeDetection(player, "sign_packet_blocked", "Sign editor packet timed out or blocked", "Vector 3 (Evasion/Sign Packet Blocked)", checker);
     }
 
     public void recordPackSent(UUID uuid) {

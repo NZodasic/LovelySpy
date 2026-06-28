@@ -1,5 +1,6 @@
-package com.lovelyspy;
+package com.lovelyspy.config;
 
+import com.lovelyspy.LovelySpyPlugin;
 import org.bukkit.configuration.file.FileConfiguration;
 import java.util.*;
 
@@ -15,6 +16,16 @@ public class Config {
     public List<String> knownCheatChannels;
     public List<String> legitimateBrands;
     public String logFile;
+    public boolean discordWebhookEnabled;
+    public String discordWebhookUrl;
+    public int discordWebhookEmbedColor;
+    public String discordWebhookMessage;
+
+    // Global action toggles
+    public boolean actionKickEnabled;
+    public boolean actionBanEnabled;
+    public boolean actionFlagEnabled;
+    public boolean actionShadowEnabled;
 
     public Config(LovelySpyPlugin plugin) {
         this.plugin = plugin;
@@ -39,6 +50,15 @@ public class Config {
         yaml.set("known_cheat_channels", knownCheatChannels);
         yaml.set("legitimate_brands", legitimateBrands);
         yaml.set("log_file", logFile);
+        yaml.set("discord-webhook.enabled", discordWebhookEnabled);
+        yaml.set("discord-webhook.webhook-url", discordWebhookUrl);
+        yaml.set("discord-webhook.embed-color", discordWebhookEmbedColor);
+        yaml.set("discord-webhook.message", discordWebhookMessage);
+        
+        yaml.set("actions.KICK", actionKickEnabled);
+        yaml.set("actions.BAN", actionBanEnabled);
+        yaml.set("actions.FLAG", actionFlagEnabled);
+        yaml.set("actions.SHADOW", actionShadowEnabled);
 
         // Clear existing mods section first to prevent ghost entries
         yaml.set("mods", null);
@@ -69,6 +89,16 @@ public class Config {
         knownCheatChannels = yaml.getStringList("known_cheat_channels");
         legitimateBrands = yaml.getStringList("legitimate_brands");
         logFile = yaml.getString("log_file", "plugins/LovelySpy/logs.json");
+        discordWebhookEnabled = yaml.getBoolean("discord-webhook.enabled", false);
+        discordWebhookUrl = yaml.getString("discord-webhook.webhook-url", "https://discord.com/api/webhooks/CHANGE_ME");
+        discordWebhookEmbedColor = yaml.getInt("discord-webhook.embed-color", 16776960);
+        discordWebhookMessage = yaml.getString("discord-webhook.message",
+                "**Player:** &name&\n**Checked by:** &checker&\n**Reason:** &reason&\n**Hacks checked:** &hacks&\n**Results:**\n&results&");
+
+        actionKickEnabled = yaml.getBoolean("actions.KICK", true);
+        actionBanEnabled = yaml.getBoolean("actions.BAN", true);
+        actionFlagEnabled = yaml.getBoolean("actions.FLAG", true);
+        actionShadowEnabled = yaml.getBoolean("actions.SHADOW", true);
 
         modEntries.clear();
         if (yaml.contains("mods")) {

@@ -1,5 +1,11 @@
 package com.lovelyspy;
 
+import com.lovelyspy.command.Commands;
+import com.lovelyspy.config.Config;
+import com.lovelyspy.config.ConfigDialogManager;
+import com.lovelyspy.detection.*;
+import com.lovelyspy.offense.OffenseManager;
+import com.lovelyspy.util.*;
 import io.papermc.paper.ban.BanListType;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -23,6 +29,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private Vector4_ResourcePackAltDetection vector4;
     private Commands commands;
     private ConfigDialogManager configDialogManager;
+    private DiscordWebhookNotifier discordWebhookNotifier;
 
     @Override
     public void onEnable() {
@@ -37,6 +44,8 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
         offenseManager = new OffenseManager(this);
         offenseManager.init();
+
+        discordWebhookNotifier = new DiscordWebhookNotifier(this);
 
         vector1 = new Vector1_TranslationFingerprint(this);
         vector2 = new Vector2_BrandChannelAnalysis(this);
@@ -112,6 +121,10 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     }
 
     public void executeDetection(Player player, String key, String responseVal, String vectorName) {
+        executeDetection(player, key, responseVal, vectorName, "Automatic");
+    }
+
+    public void executeDetection(Player player, String key, String responseVal, String vectorName, String checker) {
         // Find matched ModEntry
         Config.ModEntry matched = null;
         for (Config.ModEntry entry : config.modEntries.values()) {
@@ -163,6 +176,8 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             }
         }
 
+        discordWebhookNotifier.sendDetection(player, checker, matched, key, responseVal, vectorName, confidence, action);
+
         // Execute action on primary thread
         String finalAction = action;
         String finalMessage = message;
@@ -171,22 +186,40 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
             switch (finalAction.toUpperCase()) {
                 case "KICK":
-                    player.kick(LegacyComponentSerializer.legacySection().deserialize("§c" + finalMessage));
+                    if (config.actionKickEnabled) {
+                        player.kick(LegacyComponentSerializer.legacySection().deserialize("§c" + finalMessage));
+                    } else {
+                        getLogger().info("Action KICK is disabled globally. Skipped kick for " + player.getName());
+                    }
                     break;
                 case "BAN":
-                    int count = offenseManager.incrementOffenseCount(player.getUniqueId());
-                    Date expires = offenseManager.getBanExpiration(count);
-                    String durationStr = switch (count) {
-                        case 1 -> "15 minutes";
-                        case 2 -> "30 minutes";
-                        case 3 -> "1 day";
-                        case 4 -> "3 days";
-                        default -> "30 days";
-                    };
-                    String banMessage = finalMessage + "\n§7Offense #" + count + " - Banned for " + durationStr;
-                    PlayerProfile profile = player.getPlayerProfile();
-                    Bukkit.getBanList(BanListType.PROFILE).addBan(profile, "§c" + banMessage, expires.toInstant(), "LovelySpy");
-                    player.kick(LegacyComponentSerializer.legacySection().deserialize("§c" + banMessage));
+                    if (config.actionBanEnabled) {
+                        int count = offenseManager.incrementOffenseCount(player.getUniqueId());
+                        Date expires = offenseManager.getBanExpiration(count);
+                        String durationStr = switch (count) {
+                            case 1 -> "15 minutes";
+                            case 2 -> "30 minutes";
+                            case 3 -> "1 day";
+                            case 4 -> "3 days";
+                            default -> "30 days";
+                        };
+                        String banMessage = finalMessage + "\n§7Offense #" + count + " - Banned for " + durationStr;
+                        PlayerProfile profile = player.getPlayerProfile();
+                        Bukkit.getBanList(BanListType.PROFILE).addBan(profile, "§c" + banMessage, expires.toInstant(), "LovelySpy");
+                        player.kick(LegacyComponentSerializer.legacySection().deserialize("§c" + banMessage));
+                    } else {
+                        getLogger().info("Action BAN is disabled globally. Skipped ban for " + player.getName());
+                    }
+                    break;
+                case "FLAG":
+                    if (!config.actionFlagEnabled) {
+                        getLogger().info("Action FLAG is disabled globally. Skipped flag action for " + player.getName());
+                    }
+                    break;
+                case "SHADOW":
+                    if (!config.actionShadowEnabled) {
+                        getLogger().info("Action SHADOW is disabled globally. Skipped shadow action for " + player.getName());
+                    }
                     break;
             }
         });
