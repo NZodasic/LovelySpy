@@ -1,7 +1,6 @@
 package com.lovelyspy;
 
 import org.bukkit.Location;
-import org.bukkit.scheduler.BukkitTask;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

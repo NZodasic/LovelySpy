@@ -1,5 +1,6 @@
 package com.lovelyspy;
 
+import io.papermc.paper.ban.BanListType;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -7,6 +8,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import com.destroystokyo.paper.profile.PlayerProfile;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import java.util.*;
 
 public final class LovelySpyPlugin extends JavaPlugin implements Listener {
@@ -168,7 +171,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
             switch (finalAction.toUpperCase()) {
                 case "KICK":
-                    player.kickPlayer("§c" + finalMessage);
+                    player.kick(LegacyComponentSerializer.legacySection().deserialize("§c" + finalMessage));
                     break;
                 case "BAN":
                     int count = offenseManager.incrementOffenseCount(player.getUniqueId());
@@ -181,8 +184,9 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                         default -> "30 days";
                     };
                     String banMessage = finalMessage + "\n§7Offense #" + count + " - Banned for " + durationStr;
-                    Bukkit.getBanList(org.bukkit.BanList.Type.NAME).addBan(player.getName(), "§c" + banMessage, expires, "LovelySpy");
-                    player.kickPlayer("§c" + banMessage);
+                    PlayerProfile profile = player.getPlayerProfile();
+                    Bukkit.getBanList(BanListType.PROFILE).addBan(profile, "§c" + banMessage, expires.toInstant(), "LovelySpy");
+                    player.kick(LegacyComponentSerializer.legacySection().deserialize("§c" + banMessage));
                     break;
             }
         });
