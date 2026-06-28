@@ -158,8 +158,11 @@ public final class Vector1_TranslationFingerprint {
         }
 
         // Accumulate flagged keys
-        List<String> totalFlagged = new ArrayList<>(session.getFlaggedKeys());
-        totalFlagged.addAll(newFlagged);
+        // Keep each signature only once. Duplicate keys in configuration must not
+        // amplify one response into multiple detections or actions.
+        Set<String> uniqueFlagged = new LinkedHashSet<>(session.getFlaggedKeys());
+        uniqueFlagged.addAll(newFlagged);
+        List<String> totalFlagged = new ArrayList<>(uniqueFlagged);
 
         // If there are more pending keys, continue to the next page
         if (!session.getAllPendingKeys().isEmpty()) {
@@ -182,6 +185,16 @@ public final class Vector1_TranslationFingerprint {
             if (!session.isConfirmation()) {
                 plugin.getLogger().info("Player " + player.getName() + " passed translation fingerprinting check.");
             }
+            return;
+        }
+
+        // A single client cannot credibly expose a large collection of unrelated
+        // mod translations at once. This is the characteristic result of a
+        // malformed/automatically-closed sign response or packet incompatibility.
+        // Never confirm or punish from such a scan.
+        if (totalFlagged.size() > 3) {
+            plugin.getLogger().warning("Discarded invalid mass-positive translation scan for "
+                    + player.getName() + " (" + totalFlagged.size() + " unique keys). No action taken.");
             return;
         }
 
