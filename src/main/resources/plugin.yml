@@ -1,0 +1,27 @@
+name: LovelySpy
+version: 1.0.0
+main: com.lovelyspy.LovelySpyPlugin
+api-version: "1.21"
+folia-supported: true
+authors: [LovelySpyTeam]
+description: Multi-vector client detection without client-side agents.
+
+commands:
+  lovelyspy:
+    description: LovelySpy main command.
+    usage: /lovelyspy <subcommand> [args]
+    aliases: [lspy, spy]
+
+permissions:
+  lovelyspy.check:
+    description: Run checks and view history.
+    default: op
+  lovelyspy.alerts:
+    description: Receive live detection alerts.
+    default: op
+  lovelyspy.reload:
+    description: Reload configuration.
+    default: op
+  lovelyspy.bypass:
+    description: Exempt from all probes.
+    default: false

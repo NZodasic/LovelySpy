@@ -1,0 +1,41 @@
+# Gradle
+.gradle/
+build/
+
+# Maven (if any)
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+# Visual Studio Code
+.vscode/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Log files and runtime databases
+*.log
+offenses.json
+logs.json
+
+# Local configuration overrides (if applicable)
+local.properties
