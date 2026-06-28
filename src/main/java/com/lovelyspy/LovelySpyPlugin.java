@@ -311,7 +311,8 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         public void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object msg) throws Exception {
             try {
                 String name = msg.getClass().getSimpleName();
-                if (name.equals("ServerboundSignUpdatePacket")) {
+                if (name.equals("ServerboundSignUpdatePacket")
+                        && vector1.isProbing(player.getUniqueId())) {
                     java.lang.reflect.Method getLinesMethod = msg.getClass().getMethod("getLines");
                     String[] lines = (String[]) getLinesMethod.invoke(msg);
                     

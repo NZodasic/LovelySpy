@@ -163,7 +163,16 @@ public final class Vector1_TranslationFingerprint {
 
         // If there are more pending keys, continue to the next page
         if (!session.getAllPendingKeys().isEmpty()) {
-            probe(player, session.isConfirmation(), null, session.getAllPendingKeys(), totalFlagged, session.getChecker());
+            // Do not burst sign responses. Packet-funnel plugins commonly assign
+            // elevated weight to sign updates; spacing pages prevents LovelySpy's
+            // own probe from looking like packet spam.
+            SchedulerHelper.runTaskLater(plugin, () -> {
+                Player current = Bukkit.getPlayer(uuid);
+                if (current != null && current.isOnline()) {
+                    probe(current, session.isConfirmation(), null, session.getAllPendingKeys(),
+                            totalFlagged, session.getChecker());
+                }
+            }, plugin.getLovelyConfig().probeBatchDelayTicks);
             return;
         }
 

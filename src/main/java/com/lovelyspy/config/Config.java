@@ -11,6 +11,7 @@ public class Config {
     public int probeDelayTicks;
     public int confirmationDelayMs;
     public int probeTimeoutTicks;
+    public int probeBatchDelayTicks;
     public String canaryKey;
     public Map<String, ModEntry> modEntries = new HashMap<>();
     public List<String> knownCheatBrands;
@@ -48,6 +49,7 @@ public class Config {
         yaml.set("probe_delay_ticks", probeDelayTicks);
         yaml.set("confirmation_delay_ms", confirmationDelayMs);
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
+        yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
         yaml.set("canary_key", canaryKey);
         yaml.set("known_cheat_brands", knownCheatBrands);
         yaml.set("known_cheat_channels", knownCheatChannels);
@@ -86,9 +88,12 @@ public class Config {
     }
 
     private void parse() {
-        probeDelayTicks = yaml.getInt("probe_delay_ticks", 15);
+        // Login produces a legitimate packet burst. Starting a sign probe inside
+        // that burst can trip packet-funnel plugins before their VL has decayed.
+        probeDelayTicks = Math.max(40, yaml.getInt("probe_delay_ticks", 40));
         confirmationDelayMs = yaml.getInt("confirmation_delay_ms", 300);
         probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 60));
+        probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
         canaryKey = yaml.getString("canary_key", "key.forward");
         knownCheatBrands = yaml.getStringList("known_cheat_brands");
         knownCheatChannels = yaml.getStringList("known_cheat_channels");
