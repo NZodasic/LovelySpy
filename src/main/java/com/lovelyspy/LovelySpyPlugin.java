@@ -92,11 +92,13 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         injectPlayer(player);
 
         // Schedule translation fingerprinter after probe_delay_ticks
-        SchedulerHelper.runTaskLater(this, () -> {
-            if (player.isOnline()) {
-                vector1.probe(player);
-            }
-        }, config.probeDelayTicks);
+        if (config.translationProbeEnabled) {
+            SchedulerHelper.runTaskLater(this, () -> {
+                if (player.isOnline()) {
+                    vector1.probe(player);
+                }
+            }, config.probeDelayTicks);
+        }
     }
 
     @EventHandler
@@ -110,16 +112,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private void injectPlayer(Player player) {
         io.netty.channel.Channel channel = PacketHelper.getChannel(player);
         if (channel != null && channel.pipeline().get("lovelyspy_handler") == null) {
-            String insertionPoint = "packet_handler";
-            for (String name : channel.pipeline().names()) {
-                io.netty.channel.ChannelHandler handler = channel.pipeline().get(name);
-                if (handler != null && handler.getClass().getName().toLowerCase(Locale.ROOT)
-                        .contains("exploitfixer")) {
-                    insertionPoint = name;
-                    break;
-                }
-            }
-            channel.pipeline().addBefore(insertionPoint, "lovelyspy_handler",
+            channel.pipeline().addBefore("packet_handler", "lovelyspy_handler",
                     new PlayerPacketHandler(player));
         }
     }

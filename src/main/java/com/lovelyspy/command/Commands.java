@@ -58,6 +58,11 @@ public final class Commands implements CommandExecutor, TabCompleter {
                     sender.sendMessage("§cPlayer not found or offline.");
                     return true;
                 }
+                if (!plugin.getLovelyConfig().translationProbeEnabled) {
+                    sender.sendMessage("§c[LovelySpy] Translation probing is disabled because it is "
+                            + "not reliable with the current packet-protection stack.");
+                    return true;
+                }
                 sender.sendMessage("§e[LovelySpy] Starting manual probe on " + target.getName() + "...");
                 plugin.getVector1().probe(target, sender.getName());
                 return true;

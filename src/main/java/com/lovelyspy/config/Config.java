@@ -9,6 +9,7 @@ public class Config {
     private FileConfiguration yaml;
 
     public int probeDelayTicks;
+    public boolean translationProbeEnabled;
     public int confirmationDelayMs;
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
@@ -47,6 +48,7 @@ public class Config {
 
     public void save() {
         yaml.set("probe_delay_ticks", probeDelayTicks);
+        yaml.set("translation_probe_enabled", translationProbeEnabled);
         yaml.set("confirmation_delay_ms", confirmationDelayMs);
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
@@ -91,6 +93,7 @@ public class Config {
         // Login produces a legitimate packet burst. Starting a sign probe inside
         // that burst can trip packet-funnel plugins before their VL has decayed.
         probeDelayTicks = Math.max(40, yaml.getInt("probe_delay_ticks", 40));
+        translationProbeEnabled = yaml.getBoolean("translation_probe_enabled", false);
         confirmationDelayMs = yaml.getInt("confirmation_delay_ms", 300);
         probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 60));
         probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
