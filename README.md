@@ -1,8 +1,8 @@
 # LovelySpy 🕵️‍♂️
 
-**LovelySpy** is an advanced, lightweight, and modern client/mod detection engine built for **PaperMC 1.21.7+**. It utilizes multiple non-invasive detection vectors—including translation fingerprinting, client brand analysis, and plugin channel queries—to identify disallowed modifications and hacked clients without causing false positives.
+**LovelySpy** is an advanced, lightweight, and modern client/mod detection engine built for **Purpur 1.21.11** (supporting Folia). It utilizes multiple non-invasive detection vectors—including translation fingerprinting, client brand analysis, and plugin channel queries—to identify disallowed modifications and hacked clients without causing false positives.
 
-It comes integrated with the experimental **PaperMC Dialog API** for real-time in-game configuration and an escalating punishment system.
+It comes integrated with the native **PaperMC Dialog API** for real-time in-game configuration and an escalating punishment system.
 
 ---
 
@@ -13,6 +13,7 @@ It comes integrated with the experimental **PaperMC Dialog API** for real-time i
     *   **Vector 2 (Brand & Channel Analysis)**: Detects client identifiers sent during handshakes and queries listening plugin channels.
     *   **Vector 3 (Privacy Mod Detection)**: Detects chat signing bypasses (like NoChatReports) and privacy tools.
     *   **Vector 4 (Resource Pack Alt Detection)**: Spots client resource pack status mismatches.
+*   **Folia-Compatible Scheduling**: Thread-safe task execution using a custom scheduler utility supporting region-based multi-threading.
 *   **In-Game Admin GUI (PaperMC Dialog API)**: Configure core delays, manage blacklisted/whitelisted brand lists, add new custom translation key detections, and choose response actions—all in-game.
 *   **Escalating Ban System**: Auto-escalates ban durations for repeat offenses:
     1.  **1st Offense**: 15 Minutes
@@ -55,14 +56,14 @@ The plugin comes pre-configured with detection rules for popular client packages
 ## 🔧 Building & Installation
 
 ### Requirements
-*   **Java 21**
-*   **Gradle 8.5+** or the included wrapper
-*   **Paper 1.21.7-R0.1-SNAPSHOT** (or newer, supporting the Dialog API)
+*   **Java 25**
+*   **Gradle 9.5+** or the included wrapper
+*   **Purpur 1.21.11-R0.1-SNAPSHOT**
 
 ### Build the Plugin
 To compile the plugin and generate the production `.jar` file, run:
 ```bash
-./gradlew jar
+./gradlew build
 ```
 The output file will be saved at:
 `build/libs/LovelySpy.jar`
