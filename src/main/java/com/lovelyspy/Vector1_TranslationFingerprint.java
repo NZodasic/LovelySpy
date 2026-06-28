@@ -82,7 +82,7 @@ public final class Vector1_TranslationFingerprint {
         ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest, remainingKeys, flaggedKeys, isConfirmation);
         
         // Timeout task: if client does not respond in 5 seconds (100 ticks)
-        BukkitTask timeoutTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        SchedulerHelper.LovelyTask timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> {
             handleTimeout(player.getUniqueId());
         }, 100L);
         session.setTimeoutTask(timeoutTask);
@@ -162,7 +162,7 @@ public final class Vector1_TranslationFingerprint {
             long delayTicks = (plugin.getLovelyConfig().confirmationDelayMs * 20L) / 1000L;
             if (delayTicks < 1) delayTicks = 6L; // fallback to 300ms
             
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            SchedulerHelper.runTaskLater(plugin, () -> {
                 Player p = Bukkit.getPlayer(uuid);
                 if (p != null && p.isOnline()) {
                     probe(p, true, totalFlagged);

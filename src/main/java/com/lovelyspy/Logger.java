@@ -34,7 +34,7 @@ public final class Logger {
         inMemoryHistory.add(entry);
         
         // Write to log file asynchronously
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runTaskAsynchronously(plugin, () -> {
             File file = new File(plugin.getDataFolder(), "logs.json");
             file.getParentFile().mkdirs();
             try (OutputStreamWriter writer = new OutputStreamWriter(

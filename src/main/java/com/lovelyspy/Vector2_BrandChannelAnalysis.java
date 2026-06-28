@@ -23,7 +23,7 @@ public final class Vector2_BrandChannelAnalysis implements Listener {
         }
 
         // Schedule check 30 ticks after join to ensure client brand & channels are fully loaded
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        SchedulerHelper.runTaskLater(plugin, () -> {
             if (player.isOnline()) {
                 performAnalysis(player);
             }

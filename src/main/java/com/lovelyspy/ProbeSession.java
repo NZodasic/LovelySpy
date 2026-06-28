@@ -16,7 +16,7 @@ public final class ProbeSession {
     private final long startTime;
     private final boolean isConfirmation;
     
-    private BukkitTask timeoutTask;
+    private SchedulerHelper.LovelyTask timeoutTask;
 
     public ProbeSession(UUID uuid, String name, Location location, List<String> testedKeys, 
                         List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation) {
@@ -62,11 +62,11 @@ public final class ProbeSession {
         return isConfirmation;
     }
 
-    public BukkitTask getTimeoutTask() {
+    public SchedulerHelper.LovelyTask getTimeoutTask() {
         return timeoutTask;
     }
 
-    public void setTimeoutTask(BukkitTask timeoutTask) {
+    public void setTimeoutTask(SchedulerHelper.LovelyTask timeoutTask) {
         this.timeoutTask = timeoutTask;
     }
 }

@@ -75,7 +75,7 @@ public final class OffenseManager {
     }
 
     private void save() {
-        plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+        SchedulerHelper.runTaskAsynchronously(plugin, () -> {
             try {
                 file.getParentFile().mkdirs();
                 try (OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8);

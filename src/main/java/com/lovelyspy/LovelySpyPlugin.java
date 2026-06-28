@@ -80,7 +80,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         injectPlayer(player);
 
         // Schedule translation fingerprinter after probe_delay_ticks
-        Bukkit.getScheduler().runTaskLater(this, () -> {
+        SchedulerHelper.runTaskLater(this, () -> {
             if (player.isOnline()) {
                 vector1.probe(player);
             }
@@ -163,7 +163,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         // Execute action on primary thread
         String finalAction = action;
         String finalMessage = message;
-        Bukkit.getScheduler().runTask(this, () -> {
+        SchedulerHelper.runTask(this, () -> {
             if (!player.isOnline()) return;
 
             switch (finalAction.toUpperCase()) {
@@ -204,7 +204,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                     java.lang.reflect.Method getLinesMethod = msg.getClass().getMethod("getLines");
                     String[] lines = (String[]) getLinesMethod.invoke(msg);
                     
-                    Bukkit.getScheduler().runTask(LovelySpyPlugin.this, () -> {
+                    SchedulerHelper.runTask(LovelySpyPlugin.this, () -> {
                         vector1.handleResponse(player.getUniqueId(), lines);
                     });
                     return; // consume packet

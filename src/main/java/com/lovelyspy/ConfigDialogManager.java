@@ -81,7 +81,7 @@ public final class ConfigDialogManager {
             )).build())
         );
 
-        player.showDialog(dialog);
+        showDialog(player, dialog);
     }
 
     public void openGeneralSettings(Player player) {
@@ -136,7 +136,7 @@ public final class ConfigDialogManager {
             ))
         );
 
-        player.showDialog(dialog);
+        showDialog(player, dialog);
     }
 
     public void openCheatBrands(Player player) {
@@ -199,7 +199,7 @@ public final class ConfigDialogManager {
             )).build())
         );
 
-        player.showDialog(dialog);
+        showDialog(player, dialog);
     }
 
     public void openCheatChannels(Player player) {
@@ -262,7 +262,7 @@ public final class ConfigDialogManager {
             )).build())
         );
 
-        player.showDialog(dialog);
+        showDialog(player, dialog);
     }
 
     public void openLegitimateBrands(Player player) {
@@ -325,7 +325,7 @@ public final class ConfigDialogManager {
             )).build())
         );
 
-        player.showDialog(dialog);
+        showDialog(player, dialog);
     }
 
     public void openModDetections(Player player) {
@@ -427,6 +427,25 @@ public final class ConfigDialogManager {
             )).build())
         );
 
-        player.showDialog(dialog);
+        showDialog(player, dialog);
+    }
+
+    private void showDialog(Player player, Dialog dialog) {
+        try {
+            java.lang.reflect.Method showMethod = null;
+            for (java.lang.reflect.Method m : player.getClass().getMethods()) {
+                if (m.getName().equals("showDialog") && m.getParameterCount() == 1) {
+                    showMethod = m;
+                    break;
+                }
+            }
+            if (showMethod != null) {
+                showMethod.invoke(player, dialog);
+            } else {
+                player.sendMessage("§c[LovelySpy] Dialogs are not supported on Minecraft 1.21.1 (needs Minecraft 1.21.6+).");
+            }
+        } catch (Exception e) {
+            player.sendMessage("§c[LovelySpy] Dialogs are not supported on Minecraft 1.21.1 (needs Minecraft 1.21.6+).");
+        }
     }
 }
