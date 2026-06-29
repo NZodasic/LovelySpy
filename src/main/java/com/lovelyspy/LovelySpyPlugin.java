@@ -100,6 +100,11 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         Player player = event.getPlayer();
         injectPlayer(player);
 
+        if (!config.autoCheckOnJoinEnabled
+                || (config.autoCheckOnlyFirstJoin && player.hasPlayedBefore())) {
+            return;
+        }
+
         // Schedule translation fingerprinter after probe_delay_ticks
         SchedulerHelper.runTaskLater(this, () -> {
             if (player.isOnline()) {

@@ -28,6 +28,8 @@ public class Config {
     public int probeBatchDelayTicks;
     public String canaryKey;
     public List<String> privacyControlKeys;
+    public boolean autoCheckOnJoinEnabled;
+    public boolean autoCheckOnlyFirstJoin;
     public Map<String, ModEntry> modEntries = new LinkedHashMap<>();
     public List<String> knownCheatBrands;
     public List<String> knownCheatChannels;
@@ -74,6 +76,8 @@ public class Config {
         canaryKey = privacyControlKeys.getFirst();
         yaml.set("canary_key", canaryKey);
         yaml.set("privacy_control_keys", privacyControlKeys);
+        yaml.set("auto-check-on-join.enabled", autoCheckOnJoinEnabled);
+        yaml.set("auto-check-on-join.only-first-join", autoCheckOnlyFirstJoin);
         yaml.set("known_cheat_brands", knownCheatBrands);
         yaml.set("known_cheat_channels", knownCheatChannels);
         yaml.set("legitimate_brands", legitimateBrands);
@@ -179,6 +183,8 @@ public class Config {
         privacyControlKeys = normalizePrivacyControlKeys(canaryKey,
                 yaml.getStringList("privacy_control_keys"));
         canaryKey = privacyControlKeys.getFirst();
+        autoCheckOnJoinEnabled = yaml.getBoolean("auto-check-on-join.enabled", false);
+        autoCheckOnlyFirstJoin = yaml.getBoolean("auto-check-on-join.only-first-join", false);
         knownCheatBrands = yaml.getStringList("known_cheat_brands");
         knownCheatChannels = yaml.getStringList("known_cheat_channels");
         legitimateBrands = new ArrayList<>(yaml.getStringList("legitimate_brands"));

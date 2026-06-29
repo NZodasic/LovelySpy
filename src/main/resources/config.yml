@@ -9,6 +9,10 @@ privacy_control_keys:          # Vanilla keys that must resolve on normal client
   - "key.forward"
   - "key.jump"
   - "key.attack"
+  
+auto-check-on-join:
+  enabled: false
+  only-first-join: false
 
 # Mod/client detection entries are stored separately in mods.yml
 
@@ -24,7 +28,9 @@ known_cheat_brands:
   - "Coffee"
   - "Coffee Client"
   - "Lumina"
+  - "ThunderHack"
   - "Vape"
+  - "Doomsday"
   - "OpSec"
 known_cheat_channels:
   - "wdl|init"

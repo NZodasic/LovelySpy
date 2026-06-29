@@ -15,82 +15,118 @@ mods:
     action: BAN
     message: "Hacked Client Detected: Meteor Client"
 
+  # Wurst 7 keeps these in assets/wurst/translations/*.json and renders them
+  # through WurstTranslator/WText. Minecraft's normal Component translation
+  # table cannot see them, so this Vector 1 signature is documented but off.
   wurst:
     keys:
-      - "wurst.hud.enabled"
+      - "description.wurst.hack.clickgui"
+      - "key.wurst.zoom"
+    min_matches: 2
     action: BAN
     message: "Hacked Client Detected: Wurst Client"
+    enabled: false
 
+  # LiquidBounce keeps its client language table under resources/liquidbounce
+  # and only exposes it through LiquidBounce's own LanguageText content.
+  # Server-sent vanilla TranslatableContents should not resolve these keys.
   liquidbounce:
     keys:
-      - "liquidbounce.gui.hud"
+      - "modmenu.descriptionTranslation.liquidbounce"
+      - "liquidbounce.module.hud.description"
+      - "liquidbounce.module.translationFix.description"
+    min_matches: 2
     action: BAN
     message: "Hacked Client Detected: LiquidBounce"
+    enabled: false
 
+  # CheckHacks uses Aristois' EMC module translation key.
   aristois:
     keys:
-      - "aristois.hud.enabled"
+      - "emc.module.killaura.name"
     action: BAN
     message: "Hacked Client Detected: Aristois"
 
+  # CheckHacks uses BleachHack's module translation key.
   bleachhack:
     keys:
-      - "bleachhack.gui.mods"
+      - "bleachhack.module.killaura"
     action: BAN
     message: "Hacked Client Detected: BleachHack"
 
+  # CheckHacks uses Coffee Client's module translation key.
   coffee_client:
     keys:
-      - "coffee.gui.mods"
+      - "coffee.module.killaura.name"
     action: BAN
     message: "Hacked Client Detected: Coffee Client"
 
+  # CheckHacks uses Lumina's click GUI keybind translation key.
   lumina:
     keys:
-      - "lumina.hud.enabled"
+      - "key.lumina.open_click_gui"
     action: BAN
     message: "Hacked Client Detected: Lumina"
 
-  vape:
+  thunderhack:
     keys:
-      - "vape.enabled"
+      - "descriptions.client.clickgui"
+      - "descriptions.client.clientsettings"
+      - "descriptions.commands.bind"
+    min_matches: 3
+    action: BAN
+    message: "Hacked Client Detected: ThunderHack"
+
+  # No public Vape source was provided/found, so the old placeholder key is
+  # disabled. Vector 2 brand/channel checks remain the safer path here.
+  vape:
+    keys: []
     action: BAN
     message: "Hacked Client Detected: Vape"
+    enabled: false
+
+  # No public Doomsday source was provided/found, so there is no verified
+  # translation-probe key. Vector 2 brand checks cover explicit client brands.
+  doomsday:
+    keys: []
+    action: BAN
+    message: "Hacked Client Detected: Doomsday Client"
+    enabled: false
 
   # Unfair Advantage Mods
   killaura_fabric:
     keys:
-      - "killaura.enabled"
+      - "key.killaura"
     action: KICK
     message: "Unallowed Mod Detected: KillAura (Fabric)"
 
   autoclicker_fabric:
     keys:
-      - "autoclicker.enabled"
+      - "autoclicker-fabric.hud.holding"
     action: KICK
     message: "Unallowed Mod Detected: AutoClicker (Fabric)"
 
   autoclicker_p1k0chu:
     keys:
-      - "p1k0chu.autoclicker.enabled"
+      - "key.auto-clicker_.toggle"
     action: KICK
     message: "Unallowed Mod Detected: Auto Clicker (p1k0chu)"
 
   xray_fabric:
     keys:
-      - "xray.enabled"
+      - "xray.config.toggle"
     action: BAN
     message: "Unallowed Mod Detected: XRay (Fabric)"
 
   chestesp:
     keys:
-      - "chestesp.enabled"
+      - "key.chestesp.toggle"
     action: KICK
     message: "Unallowed Mod Detected: ChestESP"
 
   freecam:
     keys:
-      - "freecam.enabled"
+      - "key.freecam.toggle"
     action: KICK
     message: "Unallowed Mod Detected: Freecam"
 
@@ -112,19 +148,19 @@ mods:
 
   autofish:
     keys:
-      - "autofish.enabled"
+      - "key.autofish.open_gui"
     action: KICK
     message: "Unallowed Mod Detected: AutoFish"
 
   autoswitch:
     keys:
-      - "autoswitch.enabled"
+      - "key.autoswitch.toggle"
     action: KICK
     message: "Unallowed Mod Detected: AutoSwitch"
 
   antiafk:
     keys:
-      - "antiafk.enabled"
+      - "key.antiafk.toggle"
     action: KICK
     message: "Unallowed Mod Detected: AntiAFK"
 

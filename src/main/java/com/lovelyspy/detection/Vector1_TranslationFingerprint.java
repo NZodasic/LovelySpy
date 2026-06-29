@@ -11,6 +11,10 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class Vector1_TranslationFingerprint {
+    private static final int MOD_KEYS_PER_PAGE = 3;
+    private static final int SIGN_LINES = 4;
+    private static final long SIGN_RENDER_DELAY_TICKS = 10L;
+
     private final LovelySpyPlugin plugin;
     private final Map<UUID, ProbeSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, PrivacyProbeEvidence> privacyCandidates = new ConcurrentHashMap<>();
@@ -61,41 +65,15 @@ public final class Vector1_TranslationFingerprint {
             return;
         }
 
-        // Build list of remaining keys to test
-        Set<String> uniqueRemainingKeys = new LinkedHashSet<>();
-        if (pendingKeys != null) {
-            uniqueRemainingKeys.addAll(pendingKeys);
-        } else {
-            if (isConfirmation && specificKeys != null) {
-                uniqueRemainingKeys.addAll(specificKeys);
-            } else {
-                // Add all keys from config
-                for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
-                    if (entry.enabled && entry.keys != null) {
-                        uniqueRemainingKeys.addAll(entry.keys);
-                    }
-                }
-            }
-        }
-        List<String> remainingKeys = new ArrayList<>(uniqueRemainingKeys);
+        Deque<String> remainingKeys = new ArrayDeque<>(collectProbeKeys(isConfirmation, specificKeys, pendingKeys));
 
-        // Extract up to 3 keys for this pass
-        List<String> keysToTest = new ArrayList<>();
-        for (int i = 0; i < 3 && !remainingKeys.isEmpty(); i++) {
-            keysToTest.add(remainingKeys.remove(0));
-        }
+        // Extract up to three mod keys for this pass. The fourth sign line is
+        // reserved for the vanilla privacy-control key.
+        List<String> keysToTest = takeNextKeys(remainingKeys, MOD_KEYS_PER_PAGE);
 
         String controlKey = selectControlKey(accumulatedResponses);
 
-        // Pad or truncate to 3 lines (leaving line 4 for the vanilla control key)
-        List<String> lines = new ArrayList<>();
-        for (int i = 0; i < 3; i++) {
-            if (i < keysToTest.size()) {
-                lines.add(keysToTest.get(i));
-            } else {
-                lines.add("");
-            }
-        }
+        List<String> lines = paddedLines(keysToTest, MOD_KEYS_PER_PAGE);
         // Line 4 is a vanilla key that normal clients must resolve. If a client
         // echoes it back unchanged, keep it as candidate privacy-shield evidence.
         lines.add(controlKey);
@@ -108,9 +86,9 @@ public final class Vector1_TranslationFingerprint {
             return;
         }
 
-        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest, remainingKeys,
-                flaggedKeys, isConfirmation, checker, accumulatedResponses, false,
-                List.of(controlKey), List.of(), List.of(), Map.of());
+        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest,
+                new ArrayList<>(remainingKeys), flaggedKeys, isConfirmation, checker, accumulatedResponses,
+                List.of(controlKey), null);
         
         // A timeout is inconclusive: lag, packet filtering, or client protection can
         // all prevent a response. It must never be presented as a named hack.
@@ -127,7 +105,7 @@ public final class Vector1_TranslationFingerprint {
             if (sessions.get(player.getUniqueId()) == session && player.isOnline()) {
                 PacketHelper.closeScreen(player);
             }
-        }, 10L);
+        }, SIGN_RENDER_DELAY_TICKS);
     }
 
     public void handleResponse(UUID uuid, String[] lines) {
@@ -245,12 +223,53 @@ public final class Vector1_TranslationFingerprint {
                 accumulatedResponses);
     }
 
+    private List<String> collectProbeKeys(boolean isConfirmation, List<String> specificKeys,
+                                          List<String> pendingKeys) {
+        LinkedHashSet<String> uniqueKeys = new LinkedHashSet<>();
+        if (pendingKeys != null) {
+            addKeys(uniqueKeys, pendingKeys);
+        } else if (isConfirmation && specificKeys != null) {
+            addKeys(uniqueKeys, specificKeys);
+        } else {
+            for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
+                if (entry.enabled && entry.keys != null) {
+                    addKeys(uniqueKeys, entry.keys);
+                }
+            }
+        }
+        return new ArrayList<>(uniqueKeys);
+    }
+
+    private void addKeys(Set<String> target, Collection<String> keys) {
+        for (String key : keys) {
+            if (key == null || key.isBlank()) continue;
+            target.add(key.trim());
+        }
+    }
+
+    private List<String> takeNextKeys(Deque<String> pendingKeys, int maxKeys) {
+        List<String> selected = new ArrayList<>(Math.max(0, maxKeys));
+        for (int i = 0; i < maxKeys && !pendingKeys.isEmpty(); i++) {
+            selected.add(pendingKeys.removeFirst());
+        }
+        return selected;
+    }
+
+    private List<String> paddedLines(List<String> values, int lineCount) {
+        List<String> lines = new ArrayList<>(Math.max(0, lineCount));
+        for (int i = 0; i < lineCount; i++) {
+            lines.add(i < values.size() ? values.get(i) : "");
+        }
+        return lines;
+    }
+
     private String selectControlKey(Map<String, String> accumulatedResponses) {
         List<String> controlKeys = plugin.getLovelyConfig().privacyControlKeys;
         if (controlKeys == null || controlKeys.isEmpty()) {
             return plugin.getLovelyConfig().canaryKey;
         }
-        int pageIndex = accumulatedResponses == null ? 0 : Math.max(0, accumulatedResponses.size() / 3);
+        int pageIndex = accumulatedResponses == null ? 0
+                : Math.max(0, accumulatedResponses.size() / MOD_KEYS_PER_PAGE);
         return controlKeys.get(pageIndex % controlKeys.size());
     }
 
@@ -283,8 +302,8 @@ public final class Vector1_TranslationFingerprint {
                 privacyCandidates.remove(uuid);
                 return;
             }
-            boolean started = probePrivacyPage(current, plugin.getLovelyConfig().privacyControlKeys,
-                    List.of(), Map.of(), checker);
+            boolean started = probePrivacyPage(current,
+                    new PrivacyProbeState(plugin.getLovelyConfig().privacyControlKeys), checker);
             if (!started) {
                 privacyConfirmationsScheduled.remove(uuid);
                 privacyCandidates.remove(uuid);
@@ -292,10 +311,11 @@ public final class Vector1_TranslationFingerprint {
         }, delayTicks);
     }
 
-    private boolean probePrivacyPage(Player player, List<String> pendingControlKeys,
-                                    List<String> unresolvedControlKeys,
-                                    Map<String, String> controlResponses, String checker) {
+    private boolean probePrivacyPage(Player player, PrivacyProbeState state, String checker) {
         if (player.hasPermission("lovelyspy.bypass")) {
+            return false;
+        }
+        if (state == null) {
             return false;
         }
 
@@ -308,30 +328,13 @@ public final class Vector1_TranslationFingerprint {
             return false;
         }
 
-        List<String> remainingKeys = new ArrayList<>();
-        if (pendingControlKeys != null) {
-            for (String key : pendingControlKeys) {
-                if (key != null && !key.isBlank() && !remainingKeys.contains(key.trim())) {
-                    remainingKeys.add(key.trim());
-                }
-            }
-        }
-        if (remainingKeys.isEmpty()) {
-            finishPrivacyConfirmation(player,
-                    new LinkedHashSet<>(unresolvedControlKeys == null ? List.of() : unresolvedControlKeys),
-                    controlResponses == null ? Map.of() : controlResponses, checker);
+        if (!state.hasPending()) {
+            finishPrivacyConfirmation(player, state, checker);
             return true;
         }
 
-        List<String> keysToTest = new ArrayList<>();
-        for (int i = 0; i < 4 && !remainingKeys.isEmpty(); i++) {
-            keysToTest.add(remainingKeys.remove(0));
-        }
-
-        List<String> lines = new ArrayList<>();
-        for (int i = 0; i < 4; i++) {
-            lines.add(i < keysToTest.size() ? keysToTest.get(i) : "");
-        }
+        List<String> keysToTest = state.takeBatch(SIGN_LINES);
+        List<String> lines = paddedLines(keysToTest, SIGN_LINES);
 
         if (!PacketHelper.sendVirtualSign(player, loc, lines)) {
             plugin.getLogger().warning("Skipped OpSec confirmation probe for " + player.getName()
@@ -340,8 +343,7 @@ public final class Vector1_TranslationFingerprint {
         }
 
         ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc,
-                List.of(), List.of(), List.of(), true, checker, Map.of(), true,
-                keysToTest, remainingKeys, unresolvedControlKeys, controlResponses);
+                List.of(), List.of(), List.of(), true, checker, Map.of(), keysToTest, state);
         SchedulerHelper.LovelyTask timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> {
             handleTimeout(player.getUniqueId());
         }, plugin.getLovelyConfig().probeTimeoutTicks);
@@ -352,25 +354,23 @@ public final class Vector1_TranslationFingerprint {
             if (sessions.get(player.getUniqueId()) == session && player.isOnline()) {
                 PacketHelper.closeScreen(player);
             }
-        }, 10L);
+        }, SIGN_RENDER_DELAY_TICKS);
         return true;
     }
 
     private void handlePrivacyResponse(Player player, ProbeSession session, String[] lines) {
+        PrivacyProbeState state = session.getPrivacyState();
+        if (state == null) {
+            return;
+        }
         PrivacyProbeEvidence pageEvidence = analyzeControlLines(session.getControlKeys(), lines, 0);
+        state.record(pageEvidence);
 
-        Set<String> unresolved = new LinkedHashSet<>(session.getUnresolvedControlKeys());
-        unresolved.addAll(pageEvidence.unresolvedKeys());
-
-        Map<String, String> responses = new LinkedHashMap<>(session.getControlResponses());
-        responses.putAll(pageEvidence.responses());
-
-        if (!session.getPendingControlKeys().isEmpty()) {
+        if (state.hasPending()) {
             SchedulerHelper.runTaskLater(plugin, () -> {
                 Player current = Bukkit.getPlayer(player.getUniqueId());
                 if (current != null && current.isOnline()) {
-                    boolean started = probePrivacyPage(current, session.getPendingControlKeys(),
-                            new ArrayList<>(unresolved), responses, session.getChecker());
+                    boolean started = probePrivacyPage(current, state, session.getChecker());
                     if (!started) {
                         privacyConfirmationsScheduled.remove(player.getUniqueId());
                         privacyCandidates.remove(player.getUniqueId());
@@ -383,22 +383,20 @@ public final class Vector1_TranslationFingerprint {
             return;
         }
 
-        finishPrivacyConfirmation(player, unresolved, responses, session.getChecker());
+        finishPrivacyConfirmation(player, state, session.getChecker());
     }
 
-    private void finishPrivacyConfirmation(Player player, Set<String> confirmedUnresolved,
-                                           Map<String, String> confirmationResponses,
+    private void finishPrivacyConfirmation(Player player, PrivacyProbeState confirmationState,
                                            String checker) {
         UUID uuid = player.getUniqueId();
         privacyConfirmationsScheduled.remove(uuid);
         PrivacyProbeEvidence firstPass = privacyCandidates.remove(uuid);
         if (firstPass == null || firstPass.unresolvedKeys().isEmpty()
-                || confirmedUnresolved == null || confirmedUnresolved.isEmpty()) {
+                || confirmationState == null || confirmationState.unresolvedKeys().isEmpty()) {
             return;
         }
 
-        Set<String> repeated = new LinkedHashSet<>(firstPass.unresolvedKeys());
-        repeated.retainAll(confirmedUnresolved);
+        Set<String> repeated = confirmationState.repeatedUnresolvedKeys(firstPass.unresolvedKeys());
         if (repeated.isEmpty()) {
             return;
         }
@@ -406,7 +404,7 @@ public final class Vector1_TranslationFingerprint {
         String evidence = repeated.stream()
                 .map(key -> key + " stayed unresolved"
                         + " (initial=" + printableResponse(firstPass.responses().get(key))
-                        + ", confirmation=" + printableResponse(confirmationResponses.get(key)) + ")")
+                        + ", confirmation=" + printableResponse(confirmationState.responses().get(key)) + ")")
                 .collect(java.util.stream.Collectors.joining("; "));
         plugin.getVector3().flagKeyResolutionShield(player, evidence, checker);
     }
@@ -498,44 +496,6 @@ public final class Vector1_TranslationFingerprint {
             if (player != null && player.isOnline()) {
                 PacketHelper.restoreVirtualSign(player, session.getLocation());
             }
-        }
-    }
-
-    private static final class PrivacyProbeEvidence {
-        private final Set<String> unresolvedKeys;
-        private final Map<String, String> responses;
-
-        private PrivacyProbeEvidence(Set<String> unresolvedKeys, Map<String, String> responses) {
-            this.unresolvedKeys = unresolvedKeys != null
-                    ? new LinkedHashSet<>(unresolvedKeys) : new LinkedHashSet<>();
-            this.responses = responses != null
-                    ? new LinkedHashMap<>(responses) : new LinkedHashMap<>();
-        }
-
-        private static PrivacyProbeEvidence empty() {
-            return new PrivacyProbeEvidence(Set.of(), Map.of());
-        }
-
-        private boolean hasUnresolved() {
-            return !unresolvedKeys.isEmpty();
-        }
-
-        private Set<String> unresolvedKeys() {
-            return unresolvedKeys;
-        }
-
-        private Map<String, String> responses() {
-            return responses;
-        }
-
-        private PrivacyProbeEvidence merge(PrivacyProbeEvidence other) {
-            Set<String> mergedUnresolved = new LinkedHashSet<>(unresolvedKeys);
-            Map<String, String> mergedResponses = new LinkedHashMap<>(responses);
-            if (other != null) {
-                mergedUnresolved.addAll(other.unresolvedKeys);
-                mergedResponses.putAll(other.responses);
-            }
-            return new PrivacyProbeEvidence(mergedUnresolved, mergedResponses);
         }
     }
 
