@@ -157,4 +157,4 @@ mods:
   opsec:
     vector: privacy_probe
     action: BAN
-    message: "Bypass Detected: OpSec anti-fingerprinting protection"
+    message: "Bypass Detected: OpSec / ExploitPreventer-style key-resolution protection"

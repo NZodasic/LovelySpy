@@ -27,6 +27,7 @@ public class Config {
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
     public String canaryKey;
+    public List<String> privacyControlKeys;
     public Map<String, ModEntry> modEntries = new LinkedHashMap<>();
     public List<String> knownCheatBrands;
     public List<String> knownCheatChannels;
@@ -69,7 +70,10 @@ public class Config {
         yaml.set("confirmation_delay_ms", confirmationDelayMs);
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
+        privacyControlKeys = normalizePrivacyControlKeys(canaryKey, privacyControlKeys);
+        canaryKey = privacyControlKeys.getFirst();
         yaml.set("canary_key", canaryKey);
+        yaml.set("privacy_control_keys", privacyControlKeys);
         yaml.set("known_cheat_brands", knownCheatBrands);
         yaml.set("known_cheat_channels", knownCheatChannels);
         yaml.set("legitimate_brands", legitimateBrands);
@@ -172,6 +176,9 @@ public class Config {
         probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 60));
         probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
         canaryKey = yaml.getString("canary_key", "key.forward");
+        privacyControlKeys = normalizePrivacyControlKeys(canaryKey,
+                yaml.getStringList("privacy_control_keys"));
+        canaryKey = privacyControlKeys.getFirst();
         knownCheatBrands = yaml.getStringList("known_cheat_brands");
         knownCheatChannels = yaml.getStringList("known_cheat_channels");
         legitimateBrands = new ArrayList<>(yaml.getStringList("legitimate_brands"));
@@ -256,6 +263,28 @@ public class Config {
             if (!found) return false;
         }
         return true;
+    }
+
+    private List<String> normalizePrivacyControlKeys(String primaryCanary, List<String> configuredKeys) {
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        addControlKey(keys, primaryCanary);
+        if (configuredKeys != null) {
+            for (String key : configuredKeys) {
+                addControlKey(keys, key);
+            }
+        }
+        addControlKey(keys, "key.forward");
+        addControlKey(keys, "key.jump");
+        addControlKey(keys, "key.attack");
+        return new ArrayList<>(keys);
+    }
+
+    private void addControlKey(Set<String> keys, String key) {
+        if (key == null) return;
+        String cleaned = key.trim();
+        if (!cleaned.isEmpty()) {
+            keys.add(cleaned);
+        }
     }
 
     public static class ModEntry {

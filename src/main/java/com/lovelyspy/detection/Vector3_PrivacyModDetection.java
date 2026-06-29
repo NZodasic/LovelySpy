@@ -29,6 +29,12 @@ public final class Vector3_PrivacyModDetection implements Listener {
         plugin.executeDetection(player, "translation_shield", "Canary translation key did not resolve (shield active)", "Vector 3 (Translation Shield)", checker);
     }
 
+    public void flagKeyResolutionShield(Player player, String evidence, String checker) {
+        plugin.executeDetection(player, "opsec_key_resolution_blocked",
+                "Repeated vanilla key-resolution block: " + evidence,
+                "Vector 3 (OpSec / ExploitPreventer Key-Resolution Shield)", checker);
+    }
+
     public void flagSignTimeout(Player player) {
         flagSignTimeout(player, "Automatic");
     }

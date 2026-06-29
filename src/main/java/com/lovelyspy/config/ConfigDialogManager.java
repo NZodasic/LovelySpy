@@ -99,7 +99,7 @@ public final class ConfigDialogManager {
                         .initial((float) config.confirmationDelayMs)
                         .width(300)
                         .build(),
-                    DialogInput.text("canary_key", Component.text("Canary Translation Key", NamedTextColor.YELLOW))
+                    DialogInput.text("canary_key", Component.text("Primary Privacy Control Key", NamedTextColor.YELLOW))
                         .initial(config.canaryKey)
                         .width(300)
                         .build(),

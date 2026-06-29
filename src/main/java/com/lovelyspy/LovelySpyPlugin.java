@@ -159,8 +159,8 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                 matched = entry;
                 break;
             }
-            if (entry.vector != null && entry.vector.equalsIgnoreCase("privacy_probe") 
-                    && key.equals("translation_shield")) {
+            if (entry.vector != null && entry.vector.equalsIgnoreCase("privacy_probe")
+                    && isPrivacyProbeEvidence(key)) {
                 if (!entry.enabled) return;
                 matched = entry;
                 break;
@@ -169,6 +169,11 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
         executeDetection(player, List.of(key), Map.of(key, responseVal), key, responseVal,
                 vectorName, checker, matched);
+    }
+
+    private boolean isPrivacyProbeEvidence(String key) {
+        return key.equals("translation_shield")
+                || key.equals("opsec_key_resolution_blocked");
     }
 
     public void executeModDetection(Player player, Config.ModEntry matched,

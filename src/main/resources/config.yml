@@ -4,7 +4,11 @@ probe_delay_ticks: 40          # Wait 2s for the normal login packet burst to se
 confirmation_delay_ms: 300     # Time between probe and confirmation pass
 probe_timeout_ticks: 60        # No-response threshold (60 ticks = 3 seconds)
 probe_batch_delay_ticks: 20    # Pace sign responses; avoids packet-funnel false flags
-canary_key: "key.forward"      # Canary key to test translation shield
+canary_key: "key.forward"      # Primary vanilla control key; kept for older configs/GUI
+privacy_control_keys:          # Vanilla keys that must resolve on normal clients
+  - "key.forward"
+  - "key.jump"
+  - "key.attack"
 
 # Mod/client detection entries are stored separately in mods.yml
 
