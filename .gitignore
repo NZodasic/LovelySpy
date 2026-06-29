@@ -31,6 +31,7 @@ nbdist/
 # Operating System Files
 .DS_Store
 Thumbs.db
+out_source/
 
 # Log files and runtime databases
 *.log

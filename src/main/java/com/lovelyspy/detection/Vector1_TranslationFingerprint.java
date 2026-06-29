@@ -40,6 +40,12 @@ public final class Vector1_TranslationFingerprint {
 
     public void probe(Player player, boolean isConfirmation, List<String> specificKeys, List<String> pendingKeys,
                       List<String> flaggedKeys, String checker) {
+        probePage(player, isConfirmation, specificKeys, pendingKeys, flaggedKeys, checker, null);
+    }
+
+    private void probePage(Player player, boolean isConfirmation, List<String> specificKeys,
+                           List<String> pendingKeys, List<String> flaggedKeys, String checker,
+                           Map<String, String> accumulatedResponses) {
         if (player.hasPermission("lovelyspy.bypass")) {
             return;
         }
@@ -54,21 +60,22 @@ public final class Vector1_TranslationFingerprint {
         }
 
         // Build list of remaining keys to test
-        List<String> remainingKeys = new ArrayList<>();
+        Set<String> uniqueRemainingKeys = new LinkedHashSet<>();
         if (pendingKeys != null) {
-            remainingKeys.addAll(pendingKeys);
+            uniqueRemainingKeys.addAll(pendingKeys);
         } else {
             if (isConfirmation && specificKeys != null) {
-                remainingKeys.addAll(specificKeys);
+                uniqueRemainingKeys.addAll(specificKeys);
             } else {
                 // Add all keys from config
                 for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
-                    if (entry.keys != null) {
-                        remainingKeys.addAll(entry.keys);
+                    if (entry.enabled && entry.keys != null) {
+                        uniqueRemainingKeys.addAll(entry.keys);
                     }
                 }
             }
         }
+        List<String> remainingKeys = new ArrayList<>(uniqueRemainingKeys);
 
         // Extract up to 3 keys for this pass
         List<String> keysToTest = new ArrayList<>();
@@ -97,7 +104,7 @@ public final class Vector1_TranslationFingerprint {
         }
 
         ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest, remainingKeys,
-                flaggedKeys, isConfirmation, checker);
+                flaggedKeys, isConfirmation, checker, accumulatedResponses);
         
         // A timeout is inconclusive: lag, packet filtering, or client protection can
         // all prevent a response. It must never be presented as a named hack.
@@ -107,6 +114,14 @@ public final class Vector1_TranslationFingerprint {
         session.setTimeoutTask(timeoutTask);
 
         sessions.put(player.getUniqueId(), session);
+
+        // Let the client render translations before closing. Closing in the same
+        // packet tick corrupts responses on Lunar/Fabric and caused mass positives.
+        SchedulerHelper.runTaskLater(plugin, () -> {
+            if (sessions.get(player.getUniqueId()) == session && player.isOnline()) {
+                PacketHelper.closeScreen(player);
+            }
+        }, 10L);
     }
 
     public void handleResponse(UUID uuid, String[] lines) {
@@ -151,6 +166,8 @@ public final class Vector1_TranslationFingerprint {
                 newFlagged.add(key);
             }
         }
+        session.addResponses(responses);
+        Map<String, String> allResponses = new LinkedHashMap<>(session.getResponses());
 
         // If canary did not resolve, the translation shield is active (Vector 3)
         if (!canaryResolved) {
@@ -173,7 +190,7 @@ public final class Vector1_TranslationFingerprint {
                 Player current = Bukkit.getPlayer(uuid);
                 if (current != null && current.isOnline()) {
                     probe(current, session.isConfirmation(), null, session.getAllPendingKeys(),
-                            totalFlagged, session.getChecker());
+                            totalFlagged, session.getChecker(), allResponses);
                 }
             }, plugin.getLovelyConfig().probeBatchDelayTicks);
             return;
@@ -193,8 +210,8 @@ public final class Vector1_TranslationFingerprint {
         // malformed/automatically-closed sign response or packet incompatibility.
         // Never confirm or punish from such a scan.
         if (totalFlagged.size() > 3) {
-            plugin.getLogger().warning("Discarded invalid mass-positive translation scan for "
-                    + player.getName() + " (" + totalFlagged.size() + " unique keys). No action taken.");
+            plugin.reportInconclusiveScan(player, totalFlagged, allResponses,
+                    "Vector 1 (Invalid Mass-Positive Translation Scan)");
             return;
         }
 
@@ -210,10 +227,35 @@ public final class Vector1_TranslationFingerprint {
                 }
             }, delayTicks);
         } else {
-            // Confirmed! Trigger action
-            for (String key : totalFlagged) {
-                plugin.executeDetection(player, key, responses.getOrDefault(key, "Resolved"), "Vector 1 (Translation Fingerprinting)", session.getChecker());
+            // Confirmed. Group keys by configured mod so one installed mod produces
+            // one action, not one ban/offense for every translation it exposes.
+            executeConfirmedMods(player, totalFlagged, allResponses, session.getChecker());
+        }
+    }
+
+    private void probe(Player player, boolean isConfirmation, List<String> specificKeys,
+                       List<String> pendingKeys, List<String> flaggedKeys, String checker,
+                       Map<String, String> accumulatedResponses) {
+        probePage(player, isConfirmation, specificKeys, pendingKeys, flaggedKeys, checker,
+                accumulatedResponses);
+    }
+
+    private void executeConfirmedMods(Player player, List<String> confirmedKeys,
+                                      Map<String, String> responses, String checker) {
+        for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
+            if (!entry.enabled || entry.keys.isEmpty()) continue;
+
+            List<String> matches = TranslationSignatureMatcher.matchingKeys(
+                    entry.keys, confirmedKeys);
+            if (!TranslationSignatureMatcher.meetsThreshold(matches, entry.minMatches)) continue;
+
+            Map<String, String> evidence = new LinkedHashMap<>();
+            for (String key : matches) {
+                evidence.put(key, responses.getOrDefault(key, "Resolved"));
             }
+            plugin.getVector2().markConfirmedMod(player, entry.name);
+            plugin.executeModDetection(player, entry, evidence,
+                    "Vector 1 (Translation Fingerprinting)", checker);
         }
     }
 

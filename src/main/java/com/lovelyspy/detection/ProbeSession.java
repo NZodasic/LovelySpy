@@ -3,7 +3,9 @@ package com.lovelyspy.detection;
 import com.lovelyspy.util.SchedulerHelper;
 import org.bukkit.Location;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public final class ProbeSession {
@@ -13,6 +15,7 @@ public final class ProbeSession {
     private final List<String> testedKeys;
     private final List<String> allPendingKeys;
     private final List<String> flaggedKeys;
+    private final Map<String, String> responses;
     private final String checker;
     private final long startTime;
     private final boolean isConfirmation;
@@ -27,12 +30,20 @@ public final class ProbeSession {
     public ProbeSession(UUID uuid, String name, Location location, List<String> testedKeys,
                         List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation,
                         String checker) {
+        this(uuid, name, location, testedKeys, allPendingKeys, flaggedKeys, isConfirmation,
+                checker, null);
+    }
+
+    public ProbeSession(UUID uuid, String name, Location location, List<String> testedKeys,
+                        List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation,
+                        String checker, Map<String, String> responses) {
         this.uuid = uuid;
         this.name = name;
         this.location = location;
         this.testedKeys = testedKeys;
         this.allPendingKeys = allPendingKeys != null ? allPendingKeys : new ArrayList<>();
         this.flaggedKeys = flaggedKeys != null ? flaggedKeys : new ArrayList<>();
+        this.responses = responses != null ? new LinkedHashMap<>(responses) : new LinkedHashMap<>();
         this.checker = checker == null || checker.isBlank() ? "Automatic" : checker;
         this.startTime = System.currentTimeMillis();
         this.isConfirmation = isConfirmation;
@@ -60,6 +71,14 @@ public final class ProbeSession {
 
     public List<String> getFlaggedKeys() {
         return flaggedKeys;
+    }
+
+    public Map<String, String> getResponses() {
+        return responses;
+    }
+
+    public void addResponses(Map<String, String> pageResponses) {
+        responses.putAll(pageResponses);
     }
 
     public String getChecker() {

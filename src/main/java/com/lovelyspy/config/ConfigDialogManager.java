@@ -141,27 +141,28 @@ public final class ConfigDialogManager {
 
     public void openCheatBrands(Player player) {
         Config config = plugin.getLovelyConfig();
-        String currentList = String.join(", ", config.knownCheatBrands);
+        List<String> allBrands = combined(config.knownCheatBrands, config.disabledCheatBrands);
+        String currentList = formatToggleList(allBrands, config.knownCheatBrands);
         Dialog dialog = Dialog.create(builder -> builder.empty()
             .base(DialogBase.builder(Component.text("Configure Cheat Brands", NamedTextColor.RED))
                 .body(List.of(
                     DialogBody.plainMessage(Component.text("Currently blocked brands:\n" + currentList, NamedTextColor.GRAY))
                 ))
-                .inputs(List.of(
-                    DialogInput.text("brand_name", Component.text("Brand Name (add/remove)", NamedTextColor.YELLOW))
-                        .width(300)
-                        .build()
-                ))
+                .inputs(toggleInputs(allBrands, config.knownCheatBrands, "brand_name",
+                        "Add new brand name"))
                 .build()
             )
             .type(DialogType.multiAction(List.of(
-                ActionButton.builder(Component.text("Add Brand", NamedTextColor.GREEN))
-                    .tooltip(Component.text("Add the brand to block list"))
+                ActionButton.builder(Component.text("Save Toggles / Add", NamedTextColor.GREEN))
+                    .tooltip(Component.text("Save on/off states and optionally add the brand"))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player p) {
+                            applyToggles(view, allBrands, config.knownCheatBrands, config.disabledCheatBrands);
+                            config.save();
                             String brand = view.getText("brand_name");
                             if (brand != null && !brand.trim().isEmpty()) {
                                 brand = brand.trim();
+                                removeIgnoreCase(config.disabledCheatBrands, brand);
                                 if (!config.knownCheatBrands.contains(brand)) {
                                     config.knownCheatBrands.add(brand);
                                     config.save();
@@ -179,7 +180,9 @@ public final class ConfigDialogManager {
                             String brand = view.getText("brand_name");
                             if (brand != null && !brand.trim().isEmpty()) {
                                 brand = brand.trim();
-                                if (config.knownCheatBrands.remove(brand)) {
+                                boolean removed = removeIgnoreCase(config.knownCheatBrands, brand);
+                                removed |= removeIgnoreCase(config.disabledCheatBrands, brand);
+                                if (removed) {
                                     config.save();
                                     p.sendMessage("§a[LovelySpy] Removed cheat brand: " + brand);
                                 }
@@ -204,27 +207,31 @@ public final class ConfigDialogManager {
 
     public void openCheatChannels(Player player) {
         Config config = plugin.getLovelyConfig();
-        String currentList = String.join(", ", config.knownCheatChannels);
+        List<String> allChannels = combined(config.knownCheatChannels, config.disabledCheatChannels);
+        String currentList = formatToggleList(allChannels, config.knownCheatChannels);
         Dialog dialog = Dialog.create(builder -> builder.empty()
             .base(DialogBase.builder(Component.text("Configure Cheat Channels", NamedTextColor.LIGHT_PURPLE))
                 .body(List.of(
-                    DialogBody.plainMessage(Component.text("Currently blocked channels:\n" + currentList, NamedTextColor.GRAY))
+                    DialogBody.plainMessage(Component.text("Currently blocked channels:\n" + currentList
+                            + "\nSuggestions: wdl|init, seedcracker, lolimahcker, wdl|control",
+                            NamedTextColor.GRAY))
                 ))
-                .inputs(List.of(
-                    DialogInput.text("channel_name", Component.text("Channel Name (add/remove)", NamedTextColor.YELLOW))
-                        .width(300)
-                        .build()
-                ))
+                .inputs(toggleInputs(allChannels, config.knownCheatChannels, "channel_name",
+                        "Add new channel (namespace:path or legacy channel)"))
                 .build()
             )
             .type(DialogType.multiAction(List.of(
-                ActionButton.builder(Component.text("Add Channel", NamedTextColor.GREEN))
-                    .tooltip(Component.text("Add the channel to block list"))
+                ActionButton.builder(Component.text("Save Toggles / Add", NamedTextColor.GREEN))
+                    .tooltip(Component.text("Save on/off states and optionally add the channel"))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player p) {
+                            applyToggles(view, allChannels, config.knownCheatChannels,
+                                    config.disabledCheatChannels);
+                            config.save();
                             String channel = view.getText("channel_name");
                             if (channel != null && !channel.trim().isEmpty()) {
                                 channel = channel.trim();
+                                removeIgnoreCase(config.disabledCheatChannels, channel);
                                 if (!config.knownCheatChannels.contains(channel)) {
                                     config.knownCheatChannels.add(channel);
                                     config.save();
@@ -242,7 +249,9 @@ public final class ConfigDialogManager {
                             String channel = view.getText("channel_name");
                             if (channel != null && !channel.trim().isEmpty()) {
                                 channel = channel.trim();
-                                if (config.knownCheatChannels.remove(channel)) {
+                                boolean removed = removeIgnoreCase(config.knownCheatChannels, channel);
+                                removed |= removeIgnoreCase(config.disabledCheatChannels, channel);
+                                if (removed) {
                                     config.save();
                                     p.sendMessage("§a[LovelySpy] Removed cheat channel: " + channel);
                                 }
@@ -267,27 +276,29 @@ public final class ConfigDialogManager {
 
     public void openLegitimateBrands(Player player) {
         Config config = plugin.getLovelyConfig();
-        String currentList = String.join(", ", config.legitimateBrands);
+        List<String> allBrands = combined(config.legitimateBrands, config.disabledLegitimateBrands);
+        String currentList = formatToggleList(allBrands, config.legitimateBrands);
         Dialog dialog = Dialog.create(builder -> builder.empty()
             .base(DialogBase.builder(Component.text("Configure Whitelisted Brands", NamedTextColor.GREEN))
                 .body(List.of(
                     DialogBody.plainMessage(Component.text("Currently whitelisted brands:\n" + currentList, NamedTextColor.GRAY))
                 ))
-                .inputs(List.of(
-                    DialogInput.text("brand_name", Component.text("Brand Name (add/remove)", NamedTextColor.YELLOW))
-                        .width(300)
-                        .build()
-                ))
+                .inputs(toggleInputs(allBrands, config.legitimateBrands, "brand_name",
+                        "Add new whitelisted brand"))
                 .build()
             )
             .type(DialogType.multiAction(List.of(
-                ActionButton.builder(Component.text("Add Brand", NamedTextColor.GREEN))
-                    .tooltip(Component.text("Add the brand to whitelist"))
+                ActionButton.builder(Component.text("Save Toggles / Add", NamedTextColor.GREEN))
+                    .tooltip(Component.text("Save on/off states and optionally add the brand"))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player p) {
+                            applyToggles(view, allBrands, config.legitimateBrands,
+                                    config.disabledLegitimateBrands);
+                            config.save();
                             String brand = view.getText("brand_name");
                             if (brand != null && !brand.trim().isEmpty()) {
                                 brand = brand.trim();
+                                removeIgnoreCase(config.disabledLegitimateBrands, brand);
                                 if (!config.legitimateBrands.contains(brand)) {
                                     config.legitimateBrands.add(brand);
                                     config.save();
@@ -305,7 +316,9 @@ public final class ConfigDialogManager {
                             String brand = view.getText("brand_name");
                             if (brand != null && !brand.trim().isEmpty()) {
                                 brand = brand.trim();
-                                if (config.legitimateBrands.remove(brand)) {
+                                boolean removed = removeIgnoreCase(config.legitimateBrands, brand);
+                                removed |= removeIgnoreCase(config.disabledLegitimateBrands, brand);
+                                if (removed) {
                                     config.save();
                                     p.sendMessage("§a[LovelySpy] Removed brand from whitelist: " + brand);
                                 }
@@ -330,40 +343,24 @@ public final class ConfigDialogManager {
 
     public void openModDetections(Player player) {
         Config config = plugin.getLovelyConfig();
-        String currentList = String.join(", ", config.modEntries.keySet());
+        String currentList = config.modEntries.values().stream()
+                .map(entry -> (entry.enabled ? "ON  " : "OFF ") + entry.name + " [" + entry.action + "]")
+                .collect(java.util.stream.Collectors.joining("\n"));
         Dialog dialog = Dialog.create(builder -> builder.empty()
             .base(DialogBase.builder(Component.text("Configure Mod Detections", NamedTextColor.AQUA))
                 .body(List.of(
                     DialogBody.plainMessage(Component.text("Current configured mods:\n" + currentList, NamedTextColor.GRAY))
                 ))
-                .inputs(List.of(
-                    DialogInput.text("mod_name", Component.text("Mod Name (ID)", NamedTextColor.YELLOW))
-                        .width(300)
-                        .build(),
-                    DialogInput.text("keys", Component.text("Translation Keys (comma-separated)", NamedTextColor.YELLOW))
-                        .width(300)
-                        .build(),
-                    DialogInput.singleOption("action", Component.text("Action", NamedTextColor.YELLOW), List.of(
-                        SingleOptionDialogInput.OptionEntry.create("FLAG", Component.text("FLAG"), true),
-                        SingleOptionDialogInput.OptionEntry.create("KICK", Component.text("KICK"), false),
-                        SingleOptionDialogInput.OptionEntry.create("BAN", Component.text("BAN"), false),
-                        SingleOptionDialogInput.OptionEntry.create("SHADOW", Component.text("SHADOW"), false)
-                    )).build(),
-                    DialogInput.text("message", Component.text("Kick/Ban Message", NamedTextColor.YELLOW))
-                        .initial("Disallowed mod detected")
-                        .width(300)
-                        .build(),
-                    DialogInput.text("vector", Component.text("Vector (optional, e.g. privacy_probe)", NamedTextColor.YELLOW))
-                        .width(300)
-                        .build()
-                ))
+                .inputs(modInputs(config))
                 .build()
             )
             .type(DialogType.multiAction(List.of(
-                ActionButton.builder(Component.text("Save/Update Mod", NamedTextColor.GREEN))
-                    .tooltip(Component.text("Create or update this mod entry"))
+                ActionButton.builder(Component.text("Save Toggles / Add", NamedTextColor.GREEN))
+                    .tooltip(Component.text("Save on/off states and optionally create/update a mod"))
                     .action(DialogAction.customClick((view, audience) -> {
                         if (audience instanceof Player p) {
+                            applyModToggles(view, config);
+                            config.save();
                             String modName = view.getText("mod_name");
                             if (modName != null && !modName.trim().isEmpty()) {
                                 modName = modName.trim().toLowerCase();
@@ -390,8 +387,11 @@ public final class ConfigDialogManager {
                                 if (vec != null && vec.trim().isEmpty()) {
                                     vec = null;
                                 }
+                                int minMatches = Math.max(1,
+                                        view.getFloat("min_matches").intValue());
 
-                                Config.ModEntry mod = new Config.ModEntry(modName, keys, act, msg, vec);
+                                Config.ModEntry mod = new Config.ModEntry(modName, keys, minMatches,
+                                        act, msg, vec, true);
                                 config.modEntries.put(modName, mod);
                                 config.save();
                                 p.sendMessage("§a[LovelySpy] Saved/Updated mod entry: " + modName);
@@ -428,5 +428,91 @@ public final class ConfigDialogManager {
         );
 
         player.showDialog(dialog);
+    }
+
+    private List<String> combined(List<String> enabled, List<String> disabled) {
+        LinkedHashSet<String> values = new LinkedHashSet<>(enabled);
+        values.addAll(disabled);
+        return new ArrayList<>(values);
+    }
+
+    private String formatToggleList(List<String> all, List<String> enabled) {
+        return all.stream().map(value -> (containsIgnoreCase(enabled, value) ? "ON  " : "OFF ") + value)
+                .collect(java.util.stream.Collectors.joining("\n"));
+    }
+
+    private List<DialogInput> toggleInputs(List<String> all, List<String> enabled,
+                                           String addKey, String addLabel) {
+        List<DialogInput> inputs = new ArrayList<>();
+        for (int index = 0; index < all.size(); index++) {
+            String value = all.get(index);
+            inputs.add(DialogInput.bool("toggle_" + index, Component.text(value))
+                    .initial(containsIgnoreCase(enabled, value)).build());
+        }
+        inputs.add(DialogInput.text(addKey, Component.text(addLabel, NamedTextColor.YELLOW))
+                .width(300).build());
+        return inputs;
+    }
+
+    private void applyToggles(io.papermc.paper.dialog.DialogResponseView view, List<String> all,
+                              List<String> enabled, List<String> disabled) {
+        enabled.clear();
+        disabled.clear();
+        for (int index = 0; index < all.size(); index++) {
+            if (Boolean.TRUE.equals(view.getBoolean("toggle_" + index))) enabled.add(all.get(index));
+            else disabled.add(all.get(index));
+        }
+    }
+
+    private boolean containsIgnoreCase(List<String> values, String candidate) {
+        return values.stream().anyMatch(value -> value.equalsIgnoreCase(candidate));
+    }
+
+    private boolean removeIgnoreCase(List<String> values, String candidate) {
+        for (Iterator<String> iterator = values.iterator(); iterator.hasNext();) {
+            if (iterator.next().equalsIgnoreCase(candidate)) {
+                iterator.remove();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<DialogInput> modInputs(Config config) {
+        List<DialogInput> inputs = new ArrayList<>();
+        int index = 0;
+        for (Config.ModEntry entry : config.modEntries.values()) {
+            inputs.add(DialogInput.bool("mod_toggle_" + index++, Component.text(
+                    entry.name + " [" + entry.action + "]")).initial(entry.enabled).build());
+        }
+        inputs.add(DialogInput.text("mod_name", Component.text("Add/update mod ID", NamedTextColor.YELLOW))
+                .width(300).build());
+        inputs.add(DialogInput.text("keys", Component.text("Translation keys (comma-separated)",
+                NamedTextColor.YELLOW)).width(300).build());
+        inputs.add(DialogInput.numberRange("min_matches",
+                Component.text("Required matching keys", NamedTextColor.YELLOW), 1f, 3f)
+                .initial(1f).step(1f).width(300).build());
+        inputs.add(DialogInput.singleOption("action", Component.text("Action", NamedTextColor.YELLOW), List.of(
+                SingleOptionDialogInput.OptionEntry.create("FLAG", Component.text("FLAG"), true),
+                SingleOptionDialogInput.OptionEntry.create("KICK", Component.text("KICK"), false),
+                SingleOptionDialogInput.OptionEntry.create("BAN", Component.text("BAN"), false),
+                SingleOptionDialogInput.OptionEntry.create("SHADOW", Component.text("SHADOW"), false)
+        )).build());
+        inputs.add(DialogInput.text("message", Component.text("Kick/Ban message", NamedTextColor.YELLOW))
+                .initial("Disallowed mod detected").width(300).build());
+        inputs.add(DialogInput.text("vector", Component.text("Vector (optional)", NamedTextColor.YELLOW))
+                .width(300).build());
+        return inputs;
+    }
+
+    private void applyModToggles(io.papermc.paper.dialog.DialogResponseView view, Config config) {
+        int index = 0;
+        for (Map.Entry<String, Config.ModEntry> configured :
+                new ArrayList<>(config.modEntries.entrySet())) {
+            Config.ModEntry entry = configured.getValue();
+            boolean enabled = Boolean.TRUE.equals(view.getBoolean("mod_toggle_" + index++));
+            config.modEntries.put(configured.getKey(), new Config.ModEntry(entry.name, entry.keys,
+                    entry.minMatches, entry.action, entry.message, entry.vector, enabled));
+        }
     }
 }

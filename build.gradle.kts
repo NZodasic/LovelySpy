@@ -31,3 +31,19 @@ java {
 tasks.jar {
     archiveFileName.set("LovelySpy.jar")
 }
+
+val verifyTranslationSignatures by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs the dependency-free translation signature regression checks."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.lovelyspy.detection.TranslationSignatureMatcherTest")
+}
+
+tasks.test {
+    failOnNoDiscoveredTests = false
+}
+
+tasks.check {
+    dependsOn(verifyTranslationSignatures)
+}

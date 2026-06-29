@@ -1,22 +1,39 @@
 package com.lovelyspy.config;
 
 import com.lovelyspy.LovelySpyPlugin;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
+import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 public class Config {
+    private static final String LEGACY_METEOR_KEY = "meteor-client.gui.tabs.mods";
+    private static final List<String> CURRENT_METEOR_KEYS = List.of(
+            "key.meteor-client.open-gui",
+            "key.meteor-client.open-commands",
+            "key.category.meteor-client.meteor-client"
+    );
+    private static final int CURRENT_METEOR_MIN_MATCHES = 1;
+
     private final LovelySpyPlugin plugin;
     private FileConfiguration yaml;
+    private File modsFile;
+    private FileConfiguration modsYaml;
 
     public int probeDelayTicks;
     public int confirmationDelayMs;
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
     public String canaryKey;
-    public Map<String, ModEntry> modEntries = new HashMap<>();
+    public Map<String, ModEntry> modEntries = new LinkedHashMap<>();
     public List<String> knownCheatBrands;
     public List<String> knownCheatChannels;
     public List<String> legitimateBrands;
+    public List<String> disabledCheatBrands;
+    public List<String> disabledCheatChannels;
+    public List<String> disabledLegitimateBrands;
     public String logFile;
     public boolean discordBotEnabled;
     public String discordBotToken;
@@ -36,12 +53,14 @@ public class Config {
 
     public void load() {
         yaml = plugin.getConfig();
+        loadModsConfig();
         parse();
     }
 
     public void reload() {
         plugin.reloadConfig();
         yaml = plugin.getConfig();
+        loadModsConfig();
         parse();
     }
 
@@ -54,6 +73,9 @@ public class Config {
         yaml.set("known_cheat_brands", knownCheatBrands);
         yaml.set("known_cheat_channels", knownCheatChannels);
         yaml.set("legitimate_brands", legitimateBrands);
+        yaml.set("disabled_cheat_brands", disabledCheatBrands);
+        yaml.set("disabled_cheat_channels", disabledCheatChannels);
+        yaml.set("disabled_legitimate_brands", disabledLegitimateBrands);
         yaml.set("log_file", logFile);
         yaml.set("discord-bot.enabled", discordBotEnabled);
         yaml.set("discord-bot.bot-token", discordBotToken);
@@ -66,25 +88,80 @@ public class Config {
         yaml.set("actions.FLAG", actionFlagEnabled);
         yaml.set("actions.SHADOW", actionShadowEnabled);
 
-        // Clear existing mods section first to prevent ghost entries
+        // Mods live in mods.yml. Clear old inline data from config.yml so the
+        // split remains clean after GUI saves/reloads.
         yaml.set("mods", null);
+        plugin.saveConfig();
+        saveMods();
+    }
+
+    public void saveMods() {
+        if (modsYaml == null || modsFile == null) {
+            loadModsConfig();
+        }
+        modsYaml.set("mods", null);
         for (Map.Entry<String, ModEntry> entry : modEntries.entrySet()) {
             String path = "mods." + entry.getKey();
             ModEntry mod = entry.getValue();
             if (mod.keys != null) {
-                yaml.set(path + ".keys", mod.keys);
+                modsYaml.set(path + ".keys", mod.keys);
             }
+            modsYaml.set(path + ".min_matches", mod.minMatches);
             if (mod.action != null) {
-                yaml.set(path + ".action", mod.action);
+                modsYaml.set(path + ".action", mod.action);
             }
             if (mod.message != null) {
-                yaml.set(path + ".message", mod.message);
+                modsYaml.set(path + ".message", mod.message);
             }
             if (mod.vector != null) {
-                yaml.set(path + ".vector", mod.vector);
+                modsYaml.set(path + ".vector", mod.vector);
             }
+            modsYaml.set(path + ".enabled", mod.enabled);
         }
-        plugin.saveConfig();
+        try {
+            modsFile.getParentFile().mkdirs();
+            modsYaml.save(modsFile);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Failed to save mods.yml: " + exception.getMessage());
+        }
+    }
+
+    private void loadModsConfig() {
+        modsFile = new File(plugin.getDataFolder(), "mods.yml");
+        boolean hasInlineMods = yaml != null && yaml.contains("mods");
+        if (!modsFile.exists() && !hasInlineMods) {
+            plugin.saveResource("mods.yml", false);
+        }
+        modsYaml = modsFile.exists() ? YamlConfiguration.loadConfiguration(modsFile) : new YamlConfiguration();
+
+        if (hasInlineMods) {
+            if (!modsYaml.contains("mods")) {
+                ConfigurationSection oldMods = yaml.getConfigurationSection("mods");
+                if (oldMods != null) {
+                    copySection(oldMods, modsYaml, "mods");
+                    saveModsFile();
+                    plugin.getLogger().info("Migrated inline mod detections from config.yml to mods.yml.");
+                }
+            }
+            yaml.set("mods", null);
+            plugin.saveConfig();
+        }
+    }
+
+    private void saveModsFile() {
+        try {
+            modsFile.getParentFile().mkdirs();
+            modsYaml.save(modsFile);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Failed to save mods.yml: " + exception.getMessage());
+        }
+    }
+
+    private void copySection(ConfigurationSection source, FileConfiguration target, String targetRoot) {
+        for (Map.Entry<String, Object> entry : source.getValues(true).entrySet()) {
+            if (entry.getValue() instanceof ConfigurationSection) continue;
+            target.set(targetRoot + "." + entry.getKey(), entry.getValue());
+        }
     }
 
     private void parse() {
@@ -98,6 +175,9 @@ public class Config {
         knownCheatBrands = yaml.getStringList("known_cheat_brands");
         knownCheatChannels = yaml.getStringList("known_cheat_channels");
         legitimateBrands = new ArrayList<>(yaml.getStringList("legitimate_brands"));
+        disabledCheatBrands = new ArrayList<>(yaml.getStringList("disabled_cheat_brands"));
+        disabledCheatChannels = new ArrayList<>(yaml.getStringList("disabled_cheat_channels"));
+        disabledLegitimateBrands = new ArrayList<>(yaml.getStringList("disabled_legitimate_brands"));
         // Older configs used Lunar's loader name, while current Lunar versions
         // identify themselves as "lunarclient:<version>,<loader>".
         boolean hasLunarLoader = legitimateBrands.stream()
@@ -127,31 +207,85 @@ public class Config {
         actionShadowEnabled = yaml.getBoolean("actions.SHADOW", true);
 
         modEntries.clear();
-        if (yaml.contains("mods")) {
-            for (String key : yaml.getConfigurationSection("mods").getKeys(false)) {
+        boolean migratedSignatures = false;
+        if (modsYaml.contains("mods")) {
+            for (String key : modsYaml.getConfigurationSection("mods").getKeys(false)) {
                 String path = "mods." + key;
-                String action = yaml.getString(path + ".action", "FLAG");
-                String message = yaml.getString(path + ".message", "Mod detected");
-                String vector = yaml.getString(path + ".vector");
-                List<String> keys = yaml.getStringList(path + ".keys");
-                modEntries.put(key, new ModEntry(key, keys, action, message, vector));
+                String action = modsYaml.getString(path + ".action", "FLAG");
+                String message = modsYaml.getString(path + ".message", "Mod detected");
+                String vector = modsYaml.getString(path + ".vector");
+                List<String> keys = new ArrayList<>(modsYaml.getStringList(path + ".keys"));
+                boolean migratedMeteor = keys.removeIf(
+                        signature -> signature.equalsIgnoreCase(LEGACY_METEOR_KEY));
+                if (migratedMeteor) {
+                    for (String signature : CURRENT_METEOR_KEYS) {
+                        if (keys.stream().noneMatch(existing -> existing.equalsIgnoreCase(signature))) {
+                            keys.add(signature);
+                        }
+                    }
+                    modsYaml.set(path + ".keys", keys);
+                    modsYaml.set(path + ".min_matches", CURRENT_METEOR_MIN_MATCHES);
+                    migratedSignatures = true;
+                    plugin.getLogger().info("Migrated the obsolete Meteor Client translation signature "
+                            + "to the current multi-key fingerprint.");
+                }
+                int defaultMinMatches = migratedMeteor ? CURRENT_METEOR_MIN_MATCHES : 1;
+                int minMatches = modsYaml.getInt(path + ".min_matches", defaultMinMatches);
+                if (key.equalsIgnoreCase("meteor_client")
+                        && containsAllIgnoreCase(keys, CURRENT_METEOR_KEYS)
+                        && minMatches > CURRENT_METEOR_MIN_MATCHES) {
+                    minMatches = CURRENT_METEOR_MIN_MATCHES;
+                    modsYaml.set(path + ".min_matches", CURRENT_METEOR_MIN_MATCHES);
+                    migratedSignatures = true;
+                    plugin.getLogger().info("Updated Meteor Client translation detection to require one "
+                            + "confirmed current Meteor key. The Meteor namespace is unique, and the "
+                            + "probe still requires confirmation before action.");
+                }
+                boolean enabled = modsYaml.getBoolean(path + ".enabled", true);
+                modEntries.put(key, new ModEntry(key, keys, minMatches, action, message, vector, enabled));
             }
         }
+        if (migratedSignatures) {
+            saveModsFile();
+        }
+    }
+
+    private boolean containsAllIgnoreCase(List<String> values, List<String> required) {
+        for (String expected : required) {
+            boolean found = values.stream().anyMatch(value -> value.equalsIgnoreCase(expected));
+            if (!found) return false;
+        }
+        return true;
     }
 
     public static class ModEntry {
         public final String name;
         public final List<String> keys;
+        public final int minMatches;
         public final String action;
         public final String message;
         public final String vector;
+        public final boolean enabled;
 
         public ModEntry(String name, List<String> keys, String action, String message, String vector) {
+            this(name, keys, 1, action, message, vector, true);
+        }
+
+        public ModEntry(String name, List<String> keys, String action, String message, String vector,
+                        boolean enabled) {
+            this(name, keys, 1, action, message, vector, enabled);
+        }
+
+        public ModEntry(String name, List<String> keys, int minMatches, String action, String message,
+                        String vector, boolean enabled) {
             this.name = name;
-            this.keys = keys;
+            this.keys = keys != null ? List.copyOf(keys) : List.of();
+            this.minMatches = Math.max(1, Math.min(minMatches,
+                    this.keys.isEmpty() ? 1 : this.keys.size()));
             this.action = action;
             this.message = message;
             this.vector = vector;
+            this.enabled = enabled;
         }
     }
 }

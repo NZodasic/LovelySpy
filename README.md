@@ -9,7 +9,7 @@ It comes integrated with the native **PaperMC Dialog API** for real-time in-game
 ## 🚀 Key Features
 
 *   **Multi-Vector Detection Engine**:
-    *   **Vector 1 (Translation Fingerprinting)**: Probes client translation support sequentially. Detects translation-shielding and registry-bypass mechanisms (e.g., OpSec Bypass) via dynamically tested canary keys.
+    *   **Vector 1 (Translation Fingerprinting)**: Probes client translation support sequentially, confirms candidate results, and groups matching keys into one mod-level detection. `min_matches` can require multiple signatures before an action.
     *   **Vector 2 (Brand & Channel Analysis)**: Detects client identifiers sent during handshakes and queries listening plugin channels.
     *   **Vector 3 (Privacy Mod Detection)**: Detects chat signing bypasses (like NoChatReports) and privacy tools.
     *   **Vector 4 (Resource Pack Alt Detection)**: Spots client resource pack status mismatches.
@@ -39,18 +39,24 @@ All administrative commands require permission. Below is the command index:
 | `/lovelyspy resetoffense <player>` | Clears the recorded offenses back to 0 | `lovelyspy.reset` | Op |
 | `/lovelyspy history <player>` | Displays the recent check logs of a player | `lovelyspy.check` | Op |
 | `/lovelyspy alerts` | Toggles live in-game admin alert messages | `lovelyspy.alerts` | Op |
-| `/lovelyspy reload` | Reloads `config.yml` and `offenses.json` | `lovelyspy.reload` | Op |
+| `/lovelyspy reload` | Reloads `config.yml`, `mods.yml`, and `offenses.json` | `lovelyspy.reload` | Op |
 
 ---
 
-## 📦 Default Detections (`config.yml`)
+## 📦 Default Detections (`mods.yml`)
 
 The plugin comes pre-configured with detection rules for popular client packages and unfair mods:
 
 *   **Hacked Clients (BAN)**: Meteor Client, Wurst Client, LiquidBounce, Aristois, BleachHack, Coffee Client, Lumina, Vape.
-*   **Unfair Advantage Mods (KICK/BAN/FLAG)**: KillAura (Fabric), AutoClicker (Fabric), Auto Clicker (p1k0chu), XRay (Fabric), ChestESP, Freecam, AutoTotem, Inventory Profiles Next, AutoFish, AutoSwitch, AntiAFK.
-*   **Unallowed Utilities (KICK/FLAG)**: World Downloader, Item Scroller, Xaero's Minimap, JourneyMap.
-*   **Bypasses (SHADOW)**: OpSec Bypass (triggered by translation-shield check).
+*   **Unfair Advantage Mods (KICK/BAN)**: KillAura (Fabric), AutoClicker (Fabric), Auto Clicker (p1k0chu), XRay (Fabric), ChestESP, Freecam, AutoTotem, Inventory Profiles Next, AutoFish, AutoSwitch, AntiAFK.
+*   **Unallowed Utilities (KICK)**: World Downloader, Item Scroller, Xaero's Minimap, JourneyMap.
+*   **Bypasses (BAN)**: OpSec Bypass (triggered by translation-shield evidence; plain no-response remains inconclusive).
+
+Meteor Client uses a two-of-three fingerprint based on its current keybind/category
+translations. Existing installations that still contain the obsolete
+`meteor-client.gui.tabs.mods` key are migrated automatically when the mod catalogue
+loads. A confirmed mod produces one action and one offense regardless of how many
+of its keys matched.
 
 ---
 
@@ -72,4 +78,4 @@ The output file will be saved at:
 ### Install
 1. Copy `LovelySpy.jar` to your Minecraft server's `plugins/` directory.
 2. Restart the server.
-3. Configure the settings either using `/lovelyspy gui` in-game or by editing `plugins/LovelySpy/config.yml`.
+3. Configure global settings in `plugins/LovelySpy/config.yml` and mod detections in `plugins/LovelySpy/mods.yml`, or use `/lovelyspy gui` in-game.

@@ -87,6 +87,26 @@ public final class Commands implements CommandExecutor, TabCompleter {
                 showPlayerList(sender);
                 return true;
 
+            case "banable":
+                if (!sender.hasPermission("lovelyspy.check")) {
+                    sender.sendMessage("§cYou do not have permission to view punishable detections.");
+                    return true;
+                }
+                showBanable(sender);
+                return true;
+
+            case "inv":
+                if (!sender.hasPermission("lovelyspy.check")) {
+                    sender.sendMessage("§cYou do not have permission to open the review inventory.");
+                    return true;
+                }
+                if (!(sender instanceof Player inventoryViewer)) {
+                    sender.sendMessage("§cOnly players can open the inventory interface.");
+                    return true;
+                }
+                plugin.getPlayerInventoryManager().open(inventoryViewer, 0);
+                return true;
+
             case "history":
                 if (!sender.hasPermission("lovelyspy.check")) {
                     sender.sendMessage("§cYou do not have permission to view history.");
@@ -180,6 +200,8 @@ public final class Commands implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/lovelyspy check <player> §7- Manually probe a player");
         sender.sendMessage("§e/lovelyspy info <player> §7- View player client info");
         sender.sendMessage("§e/lovelyspy list §7- List detected clients and loaders");
+        sender.sendMessage("§e/lovelyspy banable §7- List enabled kick/ban detections");
+        sender.sendMessage("§e/lovelyspy inv §7- Open suspect-ranked player review GUI");
         sender.sendMessage("§e/lovelyspy history <player> §7- View player check history");
         sender.sendMessage("§e/lovelyspy offenses <player> §7- View player offense count");
         sender.sendMessage("§e/lovelyspy resetoffense <player> §7- Reset player offense count");
@@ -188,7 +210,7 @@ public final class Commands implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/lovelyspy reload §7- Reload configuration");
     }
 
-    private void showPlayerInfo(CommandSender sender, Player target) {
+    public void showPlayerInfo(CommandSender sender, Player target) {
         ClientProfile profile = plugin.getVector2().getProfile(target);
         Set<String> channels = profile.channels();
         sender.sendMessage("§6§l=== LovelySpy Profile: " + target.getName() + " ===");
@@ -210,9 +232,36 @@ public final class Commands implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void showBanable(CommandSender sender) {
+        sender.sendMessage("§6§l=== LovelySpy Kick/Ban Detections ===");
+        int count = 0;
+        for (Map.Entry<String, com.lovelyspy.config.Config.ModEntry> configured
+                : plugin.getLovelyConfig().modEntries.entrySet()) {
+            com.lovelyspy.config.Config.ModEntry entry = configured.getValue();
+            if (!entry.enabled || (!entry.action.equalsIgnoreCase("KICK")
+                    && !entry.action.equalsIgnoreCase("BAN"))) {
+                continue;
+            }
+            String color = entry.action.equalsIgnoreCase("BAN") ? "§4" : "§c";
+            String evidence = entry.keys.isEmpty()
+                    ? "vector: " + (entry.vector != null ? entry.vector : "manual")
+                    : entry.minMatches + "/" + entry.keys.size() + " keys: "
+                    + String.join(", ", entry.keys);
+            sender.sendMessage(color + "• " + configured.getKey() + " §7— §f"
+                    + entry.action.toUpperCase(Locale.ROOT) + " §8(" + evidence + ")");
+            count++;
+        }
+        if (count == 0) sender.sendMessage("§7No enabled kick/ban mod detections.");
+        sender.sendMessage("§7Blocked brands: §f"
+                + String.join(", ", plugin.getLovelyConfig().knownCheatBrands));
+        sender.sendMessage("§7Blocked channels: §f"
+                + String.join(", ", plugin.getLovelyConfig().knownCheatChannels));
+    }
+
     private void showPlayerList(CommandSender sender) {
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
-        players.sort(Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER));
+        players.sort((first, second) ->
+                String.CASE_INSENSITIVE_ORDER.compare(first.getName(), second.getName()));
         sender.sendMessage("§6§l=== LovelySpy Online Client Profiles (" + players.size() + ") ===");
         for (Player player : players) {
             ClientProfile profile = plugin.getVector2().getProfile(player);
@@ -269,6 +318,8 @@ public final class Commands implements CommandExecutor, TabCompleter {
                 subs.add("check");
                 subs.add("info");
                 subs.add("list");
+                subs.add("banable");
+                subs.add("inv");
                 subs.add("history");
                 subs.add("offenses");
             }

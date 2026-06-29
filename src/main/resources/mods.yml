@@ -1,0 +1,160 @@
+# LovelySpy mod/client detection catalogue
+#
+# Global settings, brands, channels, logging, and action toggles live in config.yml.
+# This file is only for mod/client policy entries used by translation probes and
+# privacy/evasion vectors.
+
+mods:
+  # Cheats & Hacked Clients
+  meteor_client:
+    keys:
+      - "key.meteor-client.open-gui"
+      - "key.meteor-client.open-commands"
+      - "key.category.meteor-client.meteor-client"
+    min_matches: 1
+    action: BAN
+    message: "Hacked Client Detected: Meteor Client"
+
+  wurst:
+    keys:
+      - "wurst.hud.enabled"
+    action: BAN
+    message: "Hacked Client Detected: Wurst Client"
+
+  liquidbounce:
+    keys:
+      - "liquidbounce.gui.hud"
+    action: BAN
+    message: "Hacked Client Detected: LiquidBounce"
+
+  aristois:
+    keys:
+      - "aristois.hud.enabled"
+    action: BAN
+    message: "Hacked Client Detected: Aristois"
+
+  bleachhack:
+    keys:
+      - "bleachhack.gui.mods"
+    action: BAN
+    message: "Hacked Client Detected: BleachHack"
+
+  coffee_client:
+    keys:
+      - "coffee.gui.mods"
+    action: BAN
+    message: "Hacked Client Detected: Coffee Client"
+
+  lumina:
+    keys:
+      - "lumina.hud.enabled"
+    action: BAN
+    message: "Hacked Client Detected: Lumina"
+
+  vape:
+    keys:
+      - "vape.enabled"
+    action: BAN
+    message: "Hacked Client Detected: Vape"
+
+  # Unfair Advantage Mods
+  killaura_fabric:
+    keys:
+      - "killaura.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: KillAura (Fabric)"
+
+  autoclicker_fabric:
+    keys:
+      - "autoclicker.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: AutoClicker (Fabric)"
+
+  autoclicker_p1k0chu:
+    keys:
+      - "p1k0chu.autoclicker.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: Auto Clicker (p1k0chu)"
+
+  xray_fabric:
+    keys:
+      - "xray.enabled"
+    action: BAN
+    message: "Unallowed Mod Detected: XRay (Fabric)"
+
+  chestesp:
+    keys:
+      - "chestesp.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: ChestESP"
+
+  freecam:
+    keys:
+      - "freecam.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: Freecam"
+
+  autototem:
+    keys:
+      - "autototem.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: AutoTotem"
+
+  # Meteor's AutoTotem module is covered by meteor_client. Current Meteor source
+  # does not expose stable per-module translation keys, so adding a second
+  # AutoTotem(Meteor) rule would double-punish every Meteor detection.
+
+  inventory_profiles_next:
+    keys:
+      - "inventoryprofiles.key.sort"
+    action: KICK
+    message: "Unallowed Mod Detected: Inventory Profiles Next"
+
+  autofish:
+    keys:
+      - "autofish.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: AutoFish"
+
+  autoswitch:
+    keys:
+      - "autoswitch.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: AutoSwitch"
+
+  antiafk:
+    keys:
+      - "antiafk.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: AntiAFK"
+
+  # Utility Mods (Configured as Unallowed)
+  world_downloader:
+    keys:
+      - "wdl.enabled"
+    action: KICK
+    message: "Unallowed Mod Detected: World Downloader"
+
+  item_scroller:
+    keys:
+      - "itemscroller.key.sort"
+    action: KICK
+    message: "Unallowed Mod Detected: Item Scroller"
+
+  xaero_minimap:
+    keys:
+      - "xaero_minimap.key.nearbyPlayers"
+    action: KICK
+    message: "Unallowed Mod Detected: Xaero's Minimap"
+
+  journeymap:
+    keys:
+      - "journeymap.key.map"
+    action: KICK
+    message: "Unallowed Mod Detected: JourneyMap"
+
+  # Bypassers / anti-fingerprinting tools
+  opsec:
+    vector: privacy_probe
+    action: BAN
+    message: "Bypass Detected: OpSec anti-fingerprinting protection"

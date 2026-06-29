@@ -159,6 +159,15 @@ public final class Vector2_BrandChannelAnalysis implements Listener {
         return List.copyOf(profiles.values());
     }
 
+    public void markConfirmedMod(Player player, String modId) {
+        ClientProfile profile = profiles.computeIfAbsent(player.getUniqueId(), ClientProfile::new);
+        String displayName = friendlyModName(modId);
+        profile.addMod(displayName);
+        if (displayName.equalsIgnoreCase("Meteor Client")) {
+            profile.setClient("Meteor Client");
+        }
+    }
+
     private void classifyBrand(ClientProfile profile, String brand) {
         if (brand == null) return;
         String lower = brand.toLowerCase(Locale.ROOT);
@@ -167,13 +176,27 @@ public final class Vector2_BrandChannelAnalysis implements Listener {
         else if (lower.contains("feather")) profile.setClient("Feather Client");
         else if (lower.contains("laby")) profile.setClient("LabyMod");
         else if (lower.contains("geyser")) profile.markBedrock("Geyser brand");
-        else if (lower.equals("vanilla")) profile.setClient("Vanilla");
+        else if (lower.equals("vanilla") && profile.client().equals("Unknown")) profile.setClient("Vanilla");
 
         if (lower.contains("neoforge")) profile.addLoader("NeoForge");
         else if (lower.contains("forge")) profile.addLoader("Forge");
         if (lower.contains("fabric")) profile.addLoader("Fabric");
         if (lower.contains("liteloader")) profile.addLoader("LiteLoader");
         if (lower.contains("optifine")) profile.addMod("OptiFine");
+    }
+
+    private String friendlyModName(String modId) {
+        if (modId == null || modId.isBlank()) return "Unknown mod";
+        if (modId.equalsIgnoreCase("meteor_client")) return "Meteor Client";
+
+        String[] words = modId.replace('-', '_').split("_");
+        StringBuilder result = new StringBuilder();
+        for (String word : words) {
+            if (word.isBlank()) continue;
+            if (!result.isEmpty()) result.append(' ');
+            result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return result.toString();
     }
 
     private void classifyChannel(ClientProfile profile, String channel) {

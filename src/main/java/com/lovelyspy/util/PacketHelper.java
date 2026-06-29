@@ -22,6 +22,7 @@ public final class PacketHelper {
     
     private static Class<?> blockEntityDataPacketClass;
     private static Constructor<?> blockEntityDataPacketConstructor;
+    private static Constructor<?> closeContainerPacketConstructor;
     
     private static Object signType;
     
@@ -44,6 +45,9 @@ public final class PacketHelper {
             blockEntityDataPacketClass = Class.forName("net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket");
             blockEntityDataPacketConstructor = blockEntityDataPacketClass.getConstructor(blockPosClass, blockEntityTypeClass, compoundTagClass);
 
+            Class<?> closeContainerPacketClass = Class.forName(
+                    "net.minecraft.network.protocol.game.ClientboundContainerClosePacket");
+            closeContainerPacketConstructor = closeContainerPacketClass.getConstructor(int.class);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -59,6 +63,13 @@ public final class PacketHelper {
     }
 
     public static boolean sendVirtualSign(Player player, org.bukkit.Location loc, List<String> lines) {
+        // ExploitFixer's default max_size_sign is 96. Refuse an oversized custom
+        // signature before sending any packets so LovelySpy can never trigger it.
+        for (String line : lines) {
+            if (!ProbeComponentSerializer.fitsDefaultSignLimiter(line)) {
+                return false;
+            }
+        }
         try {
             Object bp = createBlockPos(loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
             
@@ -91,6 +102,15 @@ public final class PacketHelper {
             sendPacket(player, blockUpdate);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void closeScreen(Player player) {
+        if (closeContainerPacketConstructor == null) return;
+        try {
+            sendPacket(player, closeContainerPacketConstructor.newInstance(0));
+        } catch (ReflectiveOperationException exception) {
+            exception.printStackTrace();
         }
     }
 
@@ -169,14 +189,7 @@ public final class PacketHelper {
             if (i < lines.size()) {
                 lineContent = lines.get(i);
             }
-            String json;
-            if (lineContent.startsWith("key.forward") || lineContent.startsWith("gui.yes")) {
-                json = "{\"keybind\":\"" + lineContent + "\"}";
-            } else if (!lineContent.isEmpty()) {
-                json = "{\"translate\":\"" + lineContent + "\",\"fallback\":\"" + lineContent + "\"}";
-            } else {
-                json = "{\"text\":\"\"}";
-            }
+            String json = ProbeComponentSerializer.serialize(lineContent);
             Object stringTag = stringValueOf.invoke(null, json);
             addToNbtList(messagesList, stringTag);
         }
