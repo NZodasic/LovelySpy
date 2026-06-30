@@ -228,7 +228,12 @@ public class Config {
 
         webPanelEnabled = yaml.getBoolean("web-panel.enabled", false);
         webPanelUrl = yaml.getString("web-panel.url", "http://localhost:3000/api/detections");
-        webPanelSecret = yaml.getString("web-panel.secret", "CHANGE_ME");
+        webPanelSecret = yaml.getString("web-panel.secret", "YOUR_CUSTOM_SECRET_KEY");
+        if (webPanelSecret == null || webPanelSecret.isEmpty() || webPanelSecret.equals("YOUR_CUSTOM_SECRET_KEY") || webPanelSecret.equals("CHANGE_ME")) {
+            webPanelSecret = generateSecureSecret();
+            yaml.set("web-panel.secret", webPanelSecret);
+            plugin.saveConfig();
+        }
 
         actionKickEnabled = yaml.getBoolean("actions.KICK", true);
         actionBanEnabled = yaml.getBoolean("actions.BAN", true);
@@ -289,6 +294,16 @@ public class Config {
 
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(value, max));
+    }
+
+    private String generateSecureSecret() {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(32);
+        for (int i = 0; i < 32; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        return sb.toString();
     }
 
     private List<String> normalizePrivacyControlKeys(String primaryCanary, List<String> configuredKeys) {

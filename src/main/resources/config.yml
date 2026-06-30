@@ -70,8 +70,8 @@ discord-bot:
   embed-color: 16776960
   message: "&summary&"
 
-# Web Panel Integration
+# Web Panel Integration (Supports HTTPS for Vercel deployment)
 web-panel:
   enabled: false
   url: "http://localhost:3000/api/detections"
-  secret: "CHANGE_ME"
+  secret: "YOUR_CUSTOM_SECRET_KEY"
