@@ -426,13 +426,6 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                         .hoverEvent(HoverEvent.showText(hoverComponent)))
                 .append(Component.text("Scans: " + today, NamedTextColor.GRAY))
                 .append(today >= 3 ? Component.text(" [WATCHLIST]", NamedTextColor.RED, TextDecoration.BOLD) : Component.empty())
-                .append(Component.text("  ", NamedTextColor.GRAY))
-                .append(Component.text("[INFO] ", NamedTextColor.GREEN, TextDecoration.BOLD)
-                        .clickEvent(ClickEvent.runCommand("/lovelyspy info " + player.getName()))
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to view player info profile"))))
-                .append(Component.text("[CHECK] ", NamedTextColor.YELLOW, TextDecoration.BOLD)
-                        .clickEvent(ClickEvent.runCommand("/lovelyspy check " + player.getName()))
-                        .hoverEvent(HoverEvent.showText(Component.text("Click to manually probe this player"))))
                 .build();
 
         return mainAlert;

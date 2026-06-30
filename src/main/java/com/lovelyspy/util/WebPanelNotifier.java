@@ -34,10 +34,21 @@ public final class WebPanelNotifier {
             return;
         }
 
+        final String targetUrl;
+        if (!url.endsWith("/api/detections")) {
+            if (url.endsWith("/")) {
+                targetUrl = url + "api/detections";
+            } else {
+                targetUrl = url + "/api/detections";
+            }
+        } else {
+            targetUrl = url;
+        }
+
         String body = gson.toJson(entry);
         SchedulerHelper.runTaskAsynchronously(plugin, () -> {
             try {
-                URI endpoint = URI.create(url);
+                URI endpoint = URI.create(targetUrl);
                 HttpRequest request = HttpRequest.newBuilder(endpoint)
                         .timeout(Duration.ofSeconds(10))
                         .header("Content-Type", "application/json")
