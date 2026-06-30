@@ -13,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class Vector1_TranslationFingerprint {
     private static final int MOD_KEYS_PER_PAGE = 3;
     private static final int SIGN_LINES = 4;
-    private static final long SIGN_RENDER_DELAY_TICKS = 10L;
 
     private final LovelySpyPlugin plugin;
     private final Map<UUID, ProbeSession> sessions = new ConcurrentHashMap<>();
@@ -105,7 +104,7 @@ public final class Vector1_TranslationFingerprint {
             if (sessions.get(player.getUniqueId()) == session && player.isOnline()) {
                 PacketHelper.closeScreen(player);
             }
-        }, SIGN_RENDER_DELAY_TICKS);
+        }, plugin.getLovelyConfig().signCloseDelayTicks);
     }
 
     public void handleResponse(UUID uuid, String[] lines) {
@@ -354,7 +353,7 @@ public final class Vector1_TranslationFingerprint {
             if (sessions.get(player.getUniqueId()) == session && player.isOnline()) {
                 PacketHelper.closeScreen(player);
             }
-        }, SIGN_RENDER_DELAY_TICKS);
+        }, plugin.getLovelyConfig().signCloseDelayTicks);
         return true;
     }
 

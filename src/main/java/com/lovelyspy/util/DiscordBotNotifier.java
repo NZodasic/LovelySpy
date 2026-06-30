@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.lovelyspy.LovelySpyPlugin;
 import com.lovelyspy.config.Config;
 import org.bukkit.entity.Player;
+import com.lovelyspy.detection.ClientProfile;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -12,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +32,18 @@ public final class DiscordBotNotifier {
 
     public DiscordBotNotifier(LovelySpyPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    private int getDiscordColor(String confidence, int fallbackColor) {
+        if (confidence == null) return fallbackColor;
+        return switch (confidence.toUpperCase()) {
+            case "CRITICAL" -> 15158332; // #E74C3C (Red)
+            case "HIGH" -> 15105570;     // #E67E22 (Orange)
+            case "MEDIUM" -> 15859727;   // #F1C40F (Yellow)
+            case "LOW" -> 3447003;       // #3498DB (Blue)
+            case "INCONCLUSIVE" -> 9802662; // #95A5A6 (Grey)
+            default -> fallbackColor;
+        };
     }
 
     public void sendDetection(Player player, String checker, Config.ModEntry matched, String key,
@@ -64,11 +78,41 @@ public final class DiscordBotNotifier {
                 .replace("&hacks&", hacks)
                 .replace("&results&", results);
 
+        ClientProfile profile = plugin.getVector2().getProfile(player);
+        String clientInfo = profile != null ? profile.client() : "Unknown";
+        String loaderInfo = profile != null && !profile.loaders().isEmpty() ? String.join(", ", profile.loaders()) : "None";
+        String platformInfo = profile != null ? profile.platform() : "Unknown";
+
+        List<Map<String, Object>> fields = new ArrayList<>();
+        fields.add(Map.of("name", "👤 Player", "value", "`" + playerName + "`", "inline", true));
+        fields.add(Map.of("name", "🆔 Case ID", "value", "`#" + caseId + "`", "inline", true));
+        fields.add(Map.of("name", "🚨 Detection", "value", "**" + hacks + "**", "inline", true));
+        fields.add(Map.of("name", "📊 Confidence", "value", "**" + confidence + "**", "inline", true));
+        fields.add(Map.of("name", "⚡ Action Taken", "value", "`" + action + "`", "inline", true));
+        fields.add(Map.of("name", "🔍 Vector Name", "value", "`" + reason + "`", "inline", true));
+        fields.add(Map.of("name", "💻 Platform", "value", "`" + platformInfo + "`", "inline", true));
+        fields.add(Map.of("name", "🛠️ Client Brand", "value", "`" + clientInfo + "`", "inline", true));
+        fields.add(Map.of("name", "📦 Loaders", "value", "`" + loaderInfo + "`", "inline", true));
+        fields.add(Map.of("name", "📝 Evidence Details", "value", "```\n" + results + "\n```", "inline", false));
+
         Map<String, Object> embed = new LinkedHashMap<>();
-        embed.put("title", "LovelySpy Case #" + caseId);
-        embed.put("description", truncate(stripSectionColors(description), DISCORD_EMBED_DESCRIPTION_LIMIT));
-        embed.put("color", clampDiscordColor(config.discordBotEmbedColor));
+        embed.put("title", "LovelySpy Detection Alert");
+        if (!description.equals("&summary&")) {
+            embed.put("description", truncate(stripSectionColors(description), DISCORD_EMBED_DESCRIPTION_LIMIT));
+        }
+        embed.put("color", getDiscordColor(confidence, clampDiscordColor(config.discordBotEmbedColor)));
+        embed.put("author", Map.of(
+                "name", "LovelySpy Anti-Cheat",
+                "icon_url", "https://img.icons8.com/color/48/shield.png"
+        ));
+        embed.put("thumbnail", Map.of(
+                "url", "https://cravatar.eu/avatar/" + player.getUniqueId().toString() + "/128.png"
+        ));
+        embed.put("fields", fields);
         embed.put("timestamp", Instant.now().toString());
+        embed.put("footer", Map.of(
+                "text", "LovelySpy Detection Engine"
+        ));
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("embeds", List.of(embed));

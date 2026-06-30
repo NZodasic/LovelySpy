@@ -2,7 +2,7 @@
 
 **LovelySpy** is an advanced, lightweight, and modern client/mod detection engine built for **Purpur 1.21.11** (supporting Folia). It utilizes multiple non-invasive detection vectors—including translation fingerprinting, client brand analysis, and plugin channel queries—to identify disallowed modifications and hacked clients without causing false positives.
 
-It comes integrated with the native **PaperMC Dialog API** for real-time in-game configuration and an escalating punishment system.
+It comes integrated with the native **PaperMC Dialog API** for real-time in-game configuration, a multi-channel alerting ecosystem (Discord, In-game, and Web), and an escalating punishment system.
 
 ---
 
@@ -22,6 +22,57 @@ It comes integrated with the native **PaperMC Dialog API** for real-time in-game
     4.  **4th Offense**: 3 Days
     5.  **5th+ Offense**: 30 Days
 *   **JSON-based Logging**: Records all detections with granular metadata (UUID, Name, confidence levels, triggers, actions taken) in a clean `logs.json` file.
+
+---
+
+## 🏗️ System Architecture & Data Flow
+
+LovelySpy implements a modular, asynchronous notification architecture designed to inform administrators instantly across three different channels (in-game chat, Discord, and the web-based Spy-Monitor panel) without blocking the server's main tick thread.
+
+### 1. Functional Architecture Flowchart
+This flowchart shows how client telemetry flows from the player to local storage and notification endpoints:
+
+```mermaid
+graph TD
+    classDef client fill:#1e1e2f,stroke:#3b82f6,stroke-width:2px,color:#f3f4f6;
+    classDef core fill:#2d1b4e,stroke:#a855f7,stroke-width:2px,color:#f3f4f6;
+    classDef notify fill:#3b1e30,stroke:#ec4899,stroke-width:2px,color:#f3f4f6;
+    classDef output fill:#112a20,stroke:#10b981,stroke-width:2px,color:#f3f4f6;
+    classDef storage fill:#27272a,stroke:#4b5563,stroke-width:2px,color:#f3f4f6;
+
+    A[Minecraft Client / Player]:::client -->|1. Heuristic Packet Trigger| B(LovelySpy Core Engine):::core
+    B -->|2. Asynchronous Logging| C[Local File: logs.json]:::storage
+    
+    B -->|3. Thread-Safe Event dispatch| D{Notification Manager}:::core
+    
+    D -->|In-Game Alerts| E[Staff Chat: Kyori Adventure API]:::notify
+    D -->|Discord Embeds| F[Discord Webhook API]:::notify
+    D -->|Web Sync| G[Spy-Monitor Ingestion API]:::notify
+
+    E -->|Interactive Hover/Click| H[Staff In-Game Actions: Check/Info/Ban]:::output
+    F -->|Visual Details & Cravatar| I[Discord Admin Channel]:::output
+    G -->|SSE Stream Broadcast| J[Real-time Web Monitor Dashboard]:::output
+```
+
+### 2. Temporal Event Lifecycle (Sequence Diagram)
+This timeline represents the precise ordering of operations when a detection vector is triggered:
+
+![Temporal Event Lifecycle](image/architecture.png)
+
+
+### 3. Detailed Operational Phases
+
+#### Phase A: Ingestion & Telemetry Processing
+When a player joins, Netty network handlers intercept client handshakes, brand declarations, and channel registrations. If any abnormal signatures (such as specific mod translation keys or chat-signing omissions) are recorded, the data is pushed to the evaluation queue.
+
+#### Phase B: Evaluation & Classification
+*   **Confidence Scaling**: Incoming flags are categorized into confidence classes (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `INCONCLUSIVE`).
+*   **Offense Accumulation**: Triggered vectors check against the player's active profile in the `OffenseManager` to determine if escalation (such as kick or ban) is required based on historical offenses.
+
+#### Phase C: Asynchronous Dispatch & Broadcasting
+*   **Kyori Staff Alerting**: online administrators receive a chat message formatted with clickable links (`[INFO]`, `[CHECK]`, `[BAN]`) and hovering tooltips displaying full environment details.
+*   **Discord Webhooking**: Sends a payload containing a structured embed card with color indicators matching the severity level and avatar imagery from Cravatar.
+*   **Web API Synchronization**: A background request is fired to the Node.js server. The server stores the entry and pipes it through a Server-Sent Events (SSE) stream, instantly updating the browser dashboard, drawing analytics, and displaying desktop toast notifications.
 
 ---
 
@@ -52,11 +103,46 @@ The plugin comes pre-configured with detection rules for popular client packages
 *   **Unallowed Utilities (KICK)**: World Downloader, Item Scroller, Xaero's Minimap, JourneyMap.
 *   **Bypasses (BAN)**: OpSec / ExploitPreventer-style bypass protection. LovelySpy first records a failed vanilla control-key translation, then requires a separate confirmation probe over `key.forward`, `key.jump`, and `key.attack`; plain no-response remains inconclusive.
 
-Meteor Client uses confirmed current keybind/category translations from its own
-namespace. Existing installations that still contain the obsolete
-`meteor-client.gui.tabs.mods` key are migrated automatically when the mod catalogue
-loads. A confirmed mod produces one action and one offense regardless of how many
-of its keys matched.
+Meteor Client uses confirmed current keybind/category translations from its own namespace. Existing installations that still contain the obsolete `meteor-client.gui.tabs.mods` key are migrated automatically when the mod catalogue loads. A confirmed mod produces one action and one offense regardless of how many of its keys matched.
+
+---
+
+## 🖥️ Web Panel Sync Configuration (`Spy-Monitor`)
+
+To synchronize Minecraft anti-cheat flags with the web dashboard, you must establish a secure connection between the two systems.
+
+### 🔑 Security Key Setup (Authentication)
+Yes, you **must configure a shared authentication key** in both configuration files to allow the plugin to write detections to the web panel:
+
+1.  **On the Minecraft Server**:
+    In `/plugins/LovelySpy/config.yml`, find the `web-panel` section:
+    ```yaml
+    web-panel:
+      enabled: true
+      url: "http://<YOUR_WEB_PANEL_IP>:3000/api/detections"
+      secret: "YOUR_CUSTOM_SECRET_KEY"  # <-- Change this from CHANGE_ME
+    ```
+2.  **On the Web Monitor Server**:
+    In `Spy-Monitor/config.json`, configure the matching token:
+    ```json
+    {
+      "port": 3000,
+      "secret": "YOUR_CUSTOM_SECRET_KEY"  # <-- Must match config.yml
+    }
+    ```
+*(Note: If the dashboard `secret` is left as `"CHANGE_ME"`, incoming requests will bypass secret verification, which is highly discouraged for public-facing deployments).*
+
+### Starting the Web Dashboard
+1. Navigate to the `Spy-Monitor/` directory.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the dashboard:
+   ```bash
+   npm run start
+   ```
+4. Access the premium web UI in your browser at `http://localhost:3000`.
 
 ---
 

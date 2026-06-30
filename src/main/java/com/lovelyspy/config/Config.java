@@ -26,6 +26,7 @@ public class Config {
     public int confirmationDelayMs;
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
+    public int signCloseDelayTicks;
     public String canaryKey;
     public List<String> privacyControlKeys;
     public boolean autoCheckOnJoinEnabled;
@@ -43,6 +44,11 @@ public class Config {
     public String discordBotChannelId;
     public int discordBotEmbedColor;
     public String discordBotMessage;
+
+    // Web Panel settings
+    public boolean webPanelEnabled;
+    public String webPanelUrl;
+    public String webPanelSecret;
 
     // Global action toggles
     public boolean actionKickEnabled;
@@ -72,6 +78,7 @@ public class Config {
         yaml.set("confirmation_delay_ms", confirmationDelayMs);
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
+        yaml.set("sign_close_delay_ticks", signCloseDelayTicks);
         privacyControlKeys = normalizePrivacyControlKeys(canaryKey, privacyControlKeys);
         canaryKey = privacyControlKeys.getFirst();
         yaml.set("canary_key", canaryKey);
@@ -90,6 +97,9 @@ public class Config {
         yaml.set("discord-bot.channel-id", discordBotChannelId);
         yaml.set("discord-bot.embed-color", discordBotEmbedColor);
         yaml.set("discord-bot.message", discordBotMessage);
+        yaml.set("web-panel.enabled", webPanelEnabled);
+        yaml.set("web-panel.url", webPanelUrl);
+        yaml.set("web-panel.secret", webPanelSecret);
         
         yaml.set("actions.KICK", actionKickEnabled);
         yaml.set("actions.BAN", actionBanEnabled);
@@ -179,6 +189,8 @@ public class Config {
         confirmationDelayMs = yaml.getInt("confirmation_delay_ms", 300);
         probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 60));
         probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
+        signCloseDelayTicks = clamp(yaml.getInt("sign_close_delay_ticks", 5),
+                3, Math.max(3, probeTimeoutTicks - 1));
         canaryKey = yaml.getString("canary_key", "key.forward");
         privacyControlKeys = normalizePrivacyControlKeys(canaryKey,
                 yaml.getStringList("privacy_control_keys"));
@@ -213,6 +225,10 @@ public class Config {
         if (discordBotMessage.equals(legacyDiscordMessage)) {
             discordBotMessage = "&summary&";
         }
+
+        webPanelEnabled = yaml.getBoolean("web-panel.enabled", false);
+        webPanelUrl = yaml.getString("web-panel.url", "http://localhost:3000/api/detections");
+        webPanelSecret = yaml.getString("web-panel.secret", "CHANGE_ME");
 
         actionKickEnabled = yaml.getBoolean("actions.KICK", true);
         actionBanEnabled = yaml.getBoolean("actions.BAN", true);
@@ -269,6 +285,10 @@ public class Config {
             if (!found) return false;
         }
         return true;
+    }
+
+    private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
     }
 
     private List<String> normalizePrivacyControlKeys(String primaryCanary, List<String> configuredKeys) {

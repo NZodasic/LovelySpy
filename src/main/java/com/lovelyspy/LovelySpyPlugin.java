@@ -18,6 +18,11 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import com.destroystokyo.paper.profile.PlayerProfile;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
+import net.kyori.adventure.text.event.HoverEvent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import java.util.*;
 import java.time.Duration;
 
@@ -33,6 +38,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private Commands commands;
     private ConfigDialogManager configDialogManager;
     private DiscordBotNotifier discordBotNotifier;
+    private WebPanelNotifier webPanelNotifier;
     private LibertyBansHook libertyBansHook;
     private PlayerInventoryManager playerInventoryManager;
 
@@ -51,6 +57,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         offenseManager.init();
 
         discordBotNotifier = new DiscordBotNotifier(this);
+        webPanelNotifier = new WebPanelNotifier(this);
         libertyBansHook = new LibertyBansHook(this);
         libertyBansHook.initialize();
 
@@ -148,11 +155,15 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
         String alertMsg = buildInconclusiveAlert(player, logEntry.caseId);
         Bukkit.getConsoleSender().sendMessage(alertMsg);
+        
+        Component staffAlert = buildInconclusiveAlertComponent(player, logEntry.caseId);
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (commands.isAlertsEnabled(p)) {
-                p.sendMessage(alertMsg);
+                p.sendMessage(staffAlert);
             }
         }
+        
+        webPanelNotifier.sendDetection(logEntry);
     }
 
     public void executeDetection(Player player, String key, String responseVal, String vectorName, String checker) {
@@ -229,14 +240,19 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                 confidence, action, matched, logEntry.caseId);
         
         Bukkit.getConsoleSender().sendMessage(alertMsg);
+        
+        Component staffAlert = buildStaffAlertComponent(player, evidenceKey, evidenceText, vectorName,
+                confidence, action, matched, logEntry.caseId);
         for (Player p : Bukkit.getOnlinePlayers()) {
             if (commands.isAlertsEnabled(p)) {
-                p.sendMessage(alertMsg);
+                p.sendMessage(staffAlert);
             }
         }
 
         discordBotNotifier.sendDetection(player, checker, matched, evidenceKey, evidenceText,
                 vectorName, confidence, action, logEntry.caseId, alertMsg);
+        
+        webPanelNotifier.sendDetection(logEntry);
 
         // Execute action on primary thread
         String finalAction = action;
@@ -315,6 +331,111 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         return "§c[LovelySpy] §7#" + caseId + " §8| §e" + player.getName()
                 + " §8| §6INCONCLUSIVE §8| §b" + environment
                 + " §8| §7Scans today: " + today + watch;
+    }
+
+    private Component buildStaffAlertComponent(Player player, String evidenceKey, String evidenceText,
+                                                String vectorName, String confidence, String action,
+                                                Config.ModEntry matched, long caseId) {
+        String detectionName = (matched != null) ? humanizeIdentifier(matched.name) : evidenceKey;
+        String actionDesc = describeSystemAction(action);
+        
+        NamedTextColor confidenceColor = switch (confidence.toUpperCase()) {
+            case "CLEAN" -> NamedTextColor.GREEN;
+            case "LOW" -> NamedTextColor.YELLOW;
+            case "MEDIUM" -> NamedTextColor.GOLD;
+            case "HIGH" -> NamedTextColor.RED;
+            case "CRITICAL" -> NamedTextColor.DARK_RED;
+            default -> NamedTextColor.GRAY;
+        };
+
+        ClientProfile profile = vector2.getProfile(player);
+        String loaders = profile.loaders().isEmpty() ? "None" : String.join(", ", profile.loaders());
+        
+        Component hoverComponent = Component.text()
+                .append(Component.text("=== ", NamedTextColor.GRAY))
+                .append(Component.text("LovelySpy Alert Case #" + caseId, NamedTextColor.RED, TextDecoration.BOLD))
+                .append(Component.text(" ===\n", NamedTextColor.GRAY))
+                .append(Component.text("Player: ", NamedTextColor.YELLOW)).append(Component.text(player.getName() + " (" + player.getUniqueId() + ")\n", NamedTextColor.WHITE))
+                .append(Component.text("Detection: ", NamedTextColor.YELLOW)).append(Component.text(detectionName + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Vector: ", NamedTextColor.YELLOW)).append(Component.text(vectorName + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Confidence: ", NamedTextColor.YELLOW)).append(Component.text(confidence, confidenceColor, TextDecoration.BOLD).append(Component.text("\n")))
+                .append(Component.text("Action: ", NamedTextColor.YELLOW)).append(Component.text(actionDesc + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Client/Brand: ", NamedTextColor.YELLOW)).append(Component.text(profile.client() + " / " + profile.brand() + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Loaders: ", NamedTextColor.YELLOW)).append(Component.text(loaders + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Evidence: ", NamedTextColor.YELLOW)).append(Component.text(evidenceText + "\n", NamedTextColor.WHITE))
+                .append(Component.text("-----------------------------\n", NamedTextColor.GRAY))
+                .append(Component.text("Click to view full player profile!", NamedTextColor.LIGHT_PURPLE, TextDecoration.ITALIC))
+                .build();
+
+        Component mainAlert = Component.text()
+                .append(Component.text("[LovelySpy] ", NamedTextColor.RED, TextDecoration.BOLD))
+                .append(Component.text("#" + caseId + " ", NamedTextColor.GRAY))
+                .append(Component.text(player.getName() + " ", NamedTextColor.GOLD)
+                        .clickEvent(ClickEvent.runCommand("/lovelyspy info " + player.getName()))
+                        .hoverEvent(HoverEvent.showText(hoverComponent)))
+                .append(Component.text("failed ", NamedTextColor.GRAY))
+                .append(Component.text(detectionName + " ", NamedTextColor.RED)
+                        .hoverEvent(HoverEvent.showText(hoverComponent)))
+                .append(Component.text("[", NamedTextColor.GRAY))
+                .append(Component.text(confidence, confidenceColor, TextDecoration.BOLD))
+                .append(Component.text("] ", NamedTextColor.GRAY))
+                .append(Component.text("» ", NamedTextColor.DARK_GRAY))
+                .append(Component.text(action, NamedTextColor.AQUA))
+                .append(Component.text("  ", NamedTextColor.GRAY))
+                .append(Component.text("[INFO] ", NamedTextColor.GREEN, TextDecoration.BOLD)
+                        .clickEvent(ClickEvent.runCommand("/lovelyspy info " + player.getName()))
+                        .hoverEvent(HoverEvent.showText(Component.text("Click to view player info profile"))))
+                .append(Component.text("[CHECK] ", NamedTextColor.YELLOW, TextDecoration.BOLD)
+                        .clickEvent(ClickEvent.runCommand("/lovelyspy check " + player.getName()))
+                        .hoverEvent(HoverEvent.showText(Component.text("Click to manually probe this player"))))
+                .append(Component.text("[BAN] ", NamedTextColor.DARK_RED, TextDecoration.BOLD)
+                        .clickEvent(ClickEvent.suggestCommand("/ban " + player.getName() + " LovelySpy Case #" + caseId))
+                        .hoverEvent(HoverEvent.showText(Component.text("Click to suggest banning this player"))))
+                .build();
+
+        return mainAlert;
+    }
+
+    private Component buildInconclusiveAlertComponent(Player player, long caseId) {
+        ClientProfile profile = vector2.getProfile(player);
+        String loaders = profile.loaders().isEmpty() ? "None" : String.join(", ", profile.loaders());
+        int today = loggerService.countToday(player.getUniqueId(), "INCONCLUSIVE");
+        String environment = compactEnvironment(profile.client(), loaders);
+        
+        Component hoverComponent = Component.text()
+                .append(Component.text("=== ", NamedTextColor.GRAY))
+                .append(Component.text("LovelySpy Alert Case #" + caseId, NamedTextColor.GOLD, TextDecoration.BOLD))
+                .append(Component.text(" ===\n", NamedTextColor.GRAY))
+                .append(Component.text("Player: ", NamedTextColor.YELLOW)).append(Component.text(player.getName() + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Status: ", NamedTextColor.YELLOW)).append(Component.text("INCONCLUSIVE (Translation Shield/OpSec)\n", NamedTextColor.GOLD))
+                .append(Component.text("Environment: ", NamedTextColor.YELLOW)).append(Component.text(environment + "\n", NamedTextColor.WHITE))
+                .append(Component.text("Scans Today: ", NamedTextColor.YELLOW)).append(Component.text(String.valueOf(today), NamedTextColor.WHITE))
+                .append(Component.text("\n-----------------------------\n", NamedTextColor.GRAY))
+                .append(Component.text("Click to view full player profile!", NamedTextColor.LIGHT_PURPLE, TextDecoration.ITALIC))
+                .build();
+
+        Component mainAlert = Component.text()
+                .append(Component.text("[LovelySpy] ", NamedTextColor.RED, TextDecoration.BOLD))
+                .append(Component.text("#" + caseId + " ", NamedTextColor.GRAY))
+                .append(Component.text(player.getName() + " ", NamedTextColor.GOLD)
+                        .clickEvent(ClickEvent.runCommand("/lovelyspy info " + player.getName()))
+                        .hoverEvent(HoverEvent.showText(hoverComponent)))
+                .append(Component.text("» ", NamedTextColor.DARK_GRAY))
+                .append(Component.text("INCONCLUSIVE ", NamedTextColor.GOLD))
+                .append(Component.text("(" + environment + ") ", NamedTextColor.GRAY)
+                        .hoverEvent(HoverEvent.showText(hoverComponent)))
+                .append(Component.text("Scans: " + today, NamedTextColor.GRAY))
+                .append(today >= 3 ? Component.text(" [WATCHLIST]", NamedTextColor.RED, TextDecoration.BOLD) : Component.empty())
+                .append(Component.text("  ", NamedTextColor.GRAY))
+                .append(Component.text("[INFO] ", NamedTextColor.GREEN, TextDecoration.BOLD)
+                        .clickEvent(ClickEvent.runCommand("/lovelyspy info " + player.getName()))
+                        .hoverEvent(HoverEvent.showText(Component.text("Click to view player info profile"))))
+                .append(Component.text("[CHECK] ", NamedTextColor.YELLOW, TextDecoration.BOLD)
+                        .clickEvent(ClickEvent.runCommand("/lovelyspy check " + player.getName()))
+                        .hoverEvent(HoverEvent.showText(Component.text("Click to manually probe this player"))))
+                .build();
+
+        return mainAlert;
     }
 
     private String compactEnvironment(String client, String loaders) {

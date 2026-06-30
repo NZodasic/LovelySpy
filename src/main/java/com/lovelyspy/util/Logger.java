@@ -2,6 +2,7 @@ package com.lovelyspy.util;
 
 import com.google.gson.Gson;
 import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.detection.ClientProfile;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -34,6 +35,20 @@ public final class Logger {
         entry.vectorsTriggered = vectorsTriggered;
         entry.confidence = confidence;
         entry.actionTaken = actionTaken;
+
+        // Retrieve client details
+        String clientBrand = "Unknown";
+        String loaders = "None";
+        org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(uuid);
+        if (player != null && plugin.getVector2() != null) {
+            ClientProfile profile = plugin.getVector2().getProfile(player);
+            if (profile != null) {
+                clientBrand = profile.client();
+                loaders = profile.loaders().isEmpty() ? "None" : String.join(", ", profile.loaders());
+            }
+        }
+        entry.clientBrand = clientBrand;
+        entry.loaders = loaders;
 
         inMemoryHistory.add(entry);
         
@@ -132,5 +147,7 @@ public final class Logger {
         public List<String> vectorsTriggered;
         public String confidence;
         public String actionTaken;
+        public String clientBrand;
+        public String loaders;
     }
 }

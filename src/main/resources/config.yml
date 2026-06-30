@@ -4,6 +4,7 @@ probe_delay_ticks: 40          # Wait 2s for the normal login packet burst to se
 confirmation_delay_ms: 300     # Time between probe and confirmation pass
 probe_timeout_ticks: 60        # No-response threshold (60 ticks = 3 seconds)
 probe_batch_delay_ticks: 20    # Pace sign responses; avoids packet-funnel false flags
+sign_close_delay_ticks: 5      # Close hidden sign after render; min 3 ticks to avoid corrupt responses
 canary_key: "key.forward"      # Primary vanilla control key; kept for older configs/GUI
 privacy_control_keys:          # Vanilla keys that must resolve on normal clients
   - "key.forward"
@@ -68,3 +69,9 @@ discord-bot:
   channel-id: "CHANGE_ME"
   embed-color: 16776960
   message: "&summary&"
+
+# Web Panel Integration
+web-panel:
+  enabled: false
+  url: "http://localhost:3000/api/detections"
+  secret: "CHANGE_ME"
