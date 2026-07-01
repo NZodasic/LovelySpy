@@ -13,6 +13,7 @@ It comes integrated with the native **PaperMC Dialog API** for real-time in-game
     *   **Vector 2 (Brand & Channel Analysis)**: Detects client identifiers sent during handshakes and queries listening plugin channels.
     *   **Vector 3 (Privacy Mod Detection)**: Detects chat signing bypasses (like NoChatReports), resource-pack spoofing, and confirmed key-resolution shielding used by OpSec/ExploitPreventer-style anti-fingerprinting tools.
     *   **Vector 4 (Resource Pack Alt Detection)**: Spots client resource pack status mismatches.
+    *   **Vector 5 (Baritone Behavior Correlation)**: Requires repeated pathing/mining automation evidence and independent GrimAC flags inside one time window. It does not claim that a dormant Baritone installation can be fingerprinted.
 *   **Folia-Compatible Scheduling**: Thread-safe task execution using a custom scheduler utility supporting region-based multi-threading.
 *   **In-Game Admin GUI (PaperMC Dialog API)**: Configure core delays, manage blacklisted/whitelisted brand lists, add new custom translation key detections, and choose response actions—all in-game.
 *   **Escalating Ban System**: Auto-escalates ban durations for repeat offenses:
@@ -102,10 +103,21 @@ The plugin comes pre-configured with detection rules for popular client packages
 *   **Unfair Advantage Mods (KICK/BAN)**: KillAura (Fabric), AutoClicker (Fabric), Auto Clicker (p1k0chu), XRay (Fabric), ChestESP, Freecam, AutoTotem, Inventory Profiles Next, AutoFish, AutoSwitch, AntiAFK.
 *   **Unallowed Utilities (KICK)**: World Downloader, Item Scroller, Xaero's Minimap, JourneyMap.
 *   **Bypasses (BAN)**: OpSec / ExploitPreventer-style bypass protection. LovelySpy first records a failed vanilla control-key translation, then requires a separate confirmation probe over `key.forward`, `key.jump`, and `key.attack`; plain no-response remains inconclusive.
+*   **Unverifiable modded client (disabled by default)**: An optional strict policy for servers that prohibit clients whose installed mods cannot be verified. It is intentionally labelled `INCONCLUSIVE` even if the configured policy action is `BAN`.
+*   **Baritone-like automation (FLAG by default)**: Correlates exact repeated block targeting or deterministic movement windows with at least two relevant GrimAC flags. Change this to `BAN` only after validating thresholds against normal players on the target server.
 
 Meteor Client uses confirmed current keybind/category translations from its own namespace. Existing installations that still contain the obsolete `meteor-client.gui.tabs.mods` key are migrated automatically when the mod catalogue loads. A confirmed mod produces one action and one offense regardless of how many of its keys matched.
 
 On Minecraft 1.21.11, probe signs are built through Paper's typed virtual-sign API. This is required because modern block-entity data stores structured text components; placing JSON inside legacy NBT string tags makes the JSON itself visible and creates an invalid mass-positive scan.
+
+Current OpSec and ExploitPreventer can deliberately return the same key-resolution result as a
+clean Fabric client. LovelySpy therefore reports a clean-looking scan from a known modded
+environment as `UNVERIFIABLE`, not “passed.” Enable `mods.unverifiable_modded_client` only if the
+server policy accepts banning all such clients; it cannot name which shield is installed.
+
+Standalone Baritone 1.21.11 exposes no stable translation key, custom brand, or plugin channel.
+Vector 5 observes use rather than installation and connects to GrimAC reflectively when GrimAC is
+present. Its thresholds are configured under `baritone-behavior` in `config.yml`.
 
 ---
 

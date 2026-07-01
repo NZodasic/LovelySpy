@@ -27,6 +27,12 @@ public class Config {
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
     public int signCloseDelayTicks;
+    public boolean baritoneBehaviorEnabled;
+    public int baritoneEvidenceWindowSeconds;
+    public int baritoneMinimumCenteredTargets;
+    public int baritoneMinimumMovementPatterns;
+    public int baritoneMinimumGrimFlags;
+    public int baritoneDetectionCooldownSeconds;
     public String canaryKey;
     public List<String> privacyControlKeys;
     public boolean autoCheckOnJoinEnabled;
@@ -79,6 +85,12 @@ public class Config {
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
         yaml.set("sign_close_delay_ticks", signCloseDelayTicks);
+        yaml.set("baritone-behavior.enabled", baritoneBehaviorEnabled);
+        yaml.set("baritone-behavior.evidence-window-seconds", baritoneEvidenceWindowSeconds);
+        yaml.set("baritone-behavior.minimum-centered-targets", baritoneMinimumCenteredTargets);
+        yaml.set("baritone-behavior.minimum-movement-patterns", baritoneMinimumMovementPatterns);
+        yaml.set("baritone-behavior.minimum-grim-flags", baritoneMinimumGrimFlags);
+        yaml.set("baritone-behavior.detection-cooldown-seconds", baritoneDetectionCooldownSeconds);
         privacyControlKeys = normalizePrivacyControlKeys(canaryKey, privacyControlKeys);
         canaryKey = privacyControlKeys.getFirst();
         yaml.set("canary_key", canaryKey);
@@ -191,6 +203,17 @@ public class Config {
         probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
         signCloseDelayTicks = clamp(yaml.getInt("sign_close_delay_ticks", 5),
                 3, Math.max(3, probeTimeoutTicks - 1));
+        baritoneBehaviorEnabled = yaml.getBoolean("baritone-behavior.enabled", true);
+        baritoneEvidenceWindowSeconds = clamp(
+                yaml.getInt("baritone-behavior.evidence-window-seconds", 120), 30, 600);
+        baritoneMinimumCenteredTargets = clamp(
+                yaml.getInt("baritone-behavior.minimum-centered-targets", 8), 3, 50);
+        baritoneMinimumMovementPatterns = clamp(
+                yaml.getInt("baritone-behavior.minimum-movement-patterns", 3), 1, 20);
+        baritoneMinimumGrimFlags = clamp(
+                yaml.getInt("baritone-behavior.minimum-grim-flags", 2), 1, 20);
+        baritoneDetectionCooldownSeconds = clamp(
+                yaml.getInt("baritone-behavior.detection-cooldown-seconds", 300), 30, 3600);
         canaryKey = yaml.getString("canary_key", "key.forward");
         privacyControlKeys = normalizePrivacyControlKeys(canaryKey,
                 yaml.getStringList("privacy_control_keys"));
@@ -241,7 +264,7 @@ public class Config {
         actionShadowEnabled = yaml.getBoolean("actions.SHADOW", true);
 
         modEntries.clear();
-        boolean migratedSignatures = false;
+        boolean migratedSignatures = ensureBuiltInPolicyEntries();
         if (modsYaml.contains("mods")) {
             for (String key : modsYaml.getConfigurationSection("mods").getKeys(false)) {
                 String path = "mods." + key;
@@ -282,6 +305,35 @@ public class Config {
         if (migratedSignatures) {
             saveModsFile();
         }
+    }
+
+    private boolean ensureBuiltInPolicyEntries() {
+        boolean changed = false;
+        if (!modsYaml.contains("mods.unverifiable_modded_client")) {
+            String path = "mods.unverifiable_modded_client";
+            modsYaml.set(path + ".keys", List.of());
+            modsYaml.set(path + ".vector", "unverifiable_client");
+            modsYaml.set(path + ".action", "BAN");
+            modsYaml.set(path + ".message",
+                    "Unverifiable modded client: prohibited-mod scan may be shielded");
+            modsYaml.set(path + ".enabled", false);
+            changed = true;
+        }
+        if (!modsYaml.contains("mods.baritone")) {
+            String path = "mods.baritone";
+            modsYaml.set(path + ".keys", List.of());
+            modsYaml.set(path + ".vector", "baritone_behavior");
+            modsYaml.set(path + ".action", "FLAG");
+            modsYaml.set(path + ".message",
+                    "Baritone-like automation detected (behavior + Grim correlation)");
+            modsYaml.set(path + ".enabled", true);
+            changed = true;
+        }
+        if (changed) {
+            plugin.getLogger().info("Added the built-in unverifiable-client and Baritone behavior policies "
+                    + "to mods.yml without changing existing entries.");
+        }
+        return changed;
     }
 
     private boolean containsAllIgnoreCase(List<String> values, List<String> required) {

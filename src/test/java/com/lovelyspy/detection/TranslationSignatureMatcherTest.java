@@ -20,6 +20,12 @@ public final class TranslationSignatureMatcherTest {
         rejectsNoMeteorKeys();
         duplicateConfiguredKeysDoNotIncreaseConfidence();
         meteorProbeComponentsFitExploitFixerLimit();
+        baritoneBehaviorAloneIsInsufficient();
+        grimFlagsAloneAreInsufficient();
+        centeredTargetsAndGrimFlagsCorrelate();
+        movementPatternsCanCorrelateWithGrim();
+        expiredBaritoneEvidenceIsIgnored();
+        baritoneDecisionCooldownSuppressesRepeats();
     }
 
     private static void acceptsTwoConfirmedMeteorKeys() {
@@ -72,6 +78,92 @@ public final class TranslationSignatureMatcherTest {
         }
         assertEquals(56, ProbeComponentSerializer.serialize(
                 "key.category.meteor-client.meteor-client").length());
+    }
+
+    private static void baritoneBehaviorAloneIsInsufficient() {
+        BaritoneEvidenceWindow evidence = new BaritoneEvidenceWindow();
+        evidence.recordCenteredTarget("world:1:2:3", 1_000L);
+        evidence.recordCenteredTarget("world:2:2:3", 1_001L);
+        evidence.recordCenteredTarget("world:3:2:3", 1_002L);
+
+        BaritoneEvidenceWindow.Decision decision =
+                evidence.evaluate(1_100L, 1_000L, 3, 2, 2);
+        assertCondition(!decision.meetsThreshold(),
+                "Automation-like behavior without Grim evidence must not trigger");
+    }
+
+    private static void grimFlagsAloneAreInsufficient() {
+        BaritoneEvidenceWindow evidence = new BaritoneEvidenceWindow();
+        evidence.recordGrimFlag("Aim", 1_000L);
+        evidence.recordGrimFlag("FastBreak", 1_001L);
+
+        BaritoneEvidenceWindow.Decision decision =
+                evidence.evaluate(1_100L, 1_000L, 3, 2, 2);
+        assertCondition(!decision.meetsThreshold(),
+                "Grim flags without LovelySpy behavior evidence must not trigger");
+    }
+
+    private static void centeredTargetsAndGrimFlagsCorrelate() {
+        BaritoneEvidenceWindow evidence = new BaritoneEvidenceWindow();
+        evidence.recordCenteredTarget("world:1:2:3", 1_000L);
+        evidence.recordCenteredTarget("world:2:2:3", 1_001L);
+        evidence.recordCenteredTarget("world:3:2:3", 1_002L);
+        evidence.recordGrimFlag("Aim", 1_003L);
+        evidence.recordGrimFlag("FastBreak", 1_004L);
+
+        BaritoneEvidenceWindow.Decision decision =
+                evidence.evaluate(1_100L, 1_000L, 3, 2, 2);
+        assertCondition(decision.meetsThreshold(),
+                "Centered targets plus independent Grim flags should correlate");
+        assertEquals(3, decision.centeredTargets());
+        assertEquals(2, decision.grimFlags());
+    }
+
+    private static void movementPatternsCanCorrelateWithGrim() {
+        BaritoneEvidenceWindow evidence = new BaritoneEvidenceWindow();
+        evidence.recordMovementPattern(1_000L);
+        evidence.recordMovementPattern(1_001L);
+        evidence.recordGrimFlag("Prediction", 1_002L);
+        evidence.recordGrimFlag("Timer", 1_003L);
+
+        BaritoneEvidenceWindow.Decision decision =
+                evidence.evaluate(1_100L, 1_000L, 3, 2, 2);
+        assertCondition(decision.meetsThreshold(),
+                "Repeated movement patterns plus Grim flags should correlate");
+    }
+
+    private static void expiredBaritoneEvidenceIsIgnored() {
+        BaritoneEvidenceWindow evidence = new BaritoneEvidenceWindow();
+        evidence.recordCenteredTarget("world:1:2:3", 1_000L);
+        evidence.recordCenteredTarget("world:2:2:3", 1_001L);
+        evidence.recordCenteredTarget("world:3:2:3", 1_002L);
+        evidence.recordGrimFlag("Aim", 1_003L);
+        evidence.recordGrimFlag("FastBreak", 1_004L);
+
+        BaritoneEvidenceWindow.Decision decision =
+                evidence.evaluate(3_000L, 500L, 3, 2, 2);
+        assertCondition(!decision.meetsThreshold(),
+                "Evidence outside the correlation window must expire");
+        assertEquals(0, decision.centeredTargets());
+        assertEquals(0, decision.grimFlags());
+    }
+
+    private static void baritoneDecisionCooldownSuppressesRepeats() {
+        BaritoneEvidenceWindow evidence = new BaritoneEvidenceWindow();
+        evidence.recordMovementPattern(1_000L);
+        evidence.recordMovementPattern(1_001L);
+        evidence.recordGrimFlag("Prediction", 1_002L);
+        evidence.recordGrimFlag("Timer", 1_003L);
+        assertCondition(evidence.evaluate(1_100L, 1_000L, 3, 2, 2).meetsThreshold(),
+                "Initial correlation should trigger");
+
+        evidence.beginCooldown(1_100L, 5_000L);
+        evidence.recordMovementPattern(1_200L);
+        evidence.recordMovementPattern(1_201L);
+        evidence.recordGrimFlag("Prediction", 1_202L);
+        evidence.recordGrimFlag("Timer", 1_203L);
+        assertCondition(!evidence.evaluate(1_300L, 1_000L, 3, 2, 2).meetsThreshold(),
+                "Cooldown must suppress a repeated decision");
     }
 
     private static void assertEquals(Object expected, Object actual) {

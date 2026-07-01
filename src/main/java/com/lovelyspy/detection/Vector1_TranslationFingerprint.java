@@ -191,7 +191,7 @@ public final class Vector1_TranslationFingerprint {
         if (totalFlagged.isEmpty()) {
             schedulePrivacyConfirmationIfNeeded(player, session.getChecker());
             if (!session.isConfirmation()) {
-                plugin.getLogger().info("Player " + player.getName() + " passed translation fingerprinting check.");
+                reportNoConfirmedSignatures(player, allResponses, session.getChecker());
             }
             return;
         }
@@ -452,6 +452,49 @@ public final class Vector1_TranslationFingerprint {
             plugin.executeModDetection(player, entry, evidence,
                     "Vector 1 (Translation Fingerprinting)", checker);
         }
+    }
+
+    private void reportNoConfirmedSignatures(Player player, Map<String, String> responses,
+                                             String checker) {
+        ClientProfile profile = plugin.getVector2().getProfile(player);
+        boolean moddedEnvironment = !profile.loaders().isEmpty()
+                || profile.brand().toLowerCase(Locale.ROOT).contains("fabric")
+                || profile.brand().toLowerCase(Locale.ROOT).contains("forge");
+        if (!moddedEnvironment) {
+            plugin.getLogger().info("Player " + player.getName()
+                    + " produced no confirmed translation signatures.");
+            return;
+        }
+
+        Config.ModEntry strictPolicy = findVectorPolicy("unverifiable_client");
+        String loaders = profile.loaders().isEmpty()
+                ? "modded brand " + profile.brand()
+                : String.join(", ", profile.loaders());
+        String evidence = "No prohibited translation signature resolved across "
+                + responses.size() + " responses in a " + loaders
+                + " environment. This is compatible with either a clean modded client "
+                + "or a correctly emulated OpSec/ExploitPreventer response.";
+        if (strictPolicy != null && strictPolicy.enabled) {
+            plugin.executeModDetection(
+                    player,
+                    strictPolicy,
+                    Map.of("unverifiable_client", evidence),
+                    "Vector 3 (Strict Unverifiable-Client Policy)",
+                    checker);
+            return;
+        }
+        plugin.getLogger().info("Player " + player.getName()
+                + " produced no confirmed translation signatures, but the result is UNVERIFIABLE "
+                + "against current key-resolution shields (" + loaders + ").");
+    }
+
+    private Config.ModEntry findVectorPolicy(String vector) {
+        for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
+            if (entry.vector != null && entry.vector.equalsIgnoreCase(vector)) {
+                return entry;
+            }
+        }
+        return null;
     }
 
     private void handleTimeout(UUID uuid) {

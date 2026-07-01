@@ -10,6 +10,17 @@ privacy_control_keys:          # Vanilla keys that must resolve on normal client
   - "key.forward"
   - "key.jump"
   - "key.attack"
+
+# Standalone Baritone exposes no stable brand, channel, keybind, or translation
+# signature. This detector therefore correlates repeated automation-like motion
+# with independent GrimAC flags. Its policy entry defaults to FLAG in mods.yml.
+baritone-behavior:
+  enabled: true
+  evidence-window-seconds: 120
+  minimum-centered-targets: 8
+  minimum-movement-patterns: 3
+  minimum-grim-flags: 2
+  detection-cooldown-seconds: 300
   
 auto-check-on-join:
   enabled: false

@@ -194,3 +194,24 @@ mods:
     vector: privacy_probe
     action: BAN
     message: "Bypass Detected: OpSec / ExploitPreventer-style key-resolution protection"
+
+  # Opt-in strict policy. Current OpSec/ExploitPreventer can make a prohibited
+  # mod's translation response identical to a clean Fabric response, so this
+  # cannot identify the shield by name. Enabling it bans every modded client
+  # whose scan cannot prove which prohibited mods are absent.
+  unverifiable_modded_client:
+    keys: []
+    vector: unverifiable_client
+    action: BAN
+    message: "Unverifiable modded client: prohibited-mod scan may be shielded"
+    enabled: false
+
+  # Official standalone Baritone 1.21.11 has no translation/keybind/channel
+  # fingerprint. This entry is fed only by correlated behavior plus GrimAC
+  # flags. Keep FLAG until thresholds have been validated on this server.
+  baritone:
+    keys: []
+    vector: baritone_behavior
+    action: FLAG
+    message: "Baritone-like automation detected (behavior + Grim correlation)"
+    enabled: true

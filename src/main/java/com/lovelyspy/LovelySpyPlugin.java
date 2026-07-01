@@ -35,6 +35,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private Vector2_BrandChannelAnalysis vector2;
     private Vector3_PrivacyModDetection vector3;
     private Vector4_ResourcePackAltDetection vector4;
+    private Vector5_BaritoneBehaviorDetection vector5;
     private Commands commands;
     private ConfigDialogManager configDialogManager;
     private DiscordBotNotifier discordBotNotifier;
@@ -65,6 +66,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         vector2 = new Vector2_BrandChannelAnalysis(this);
         vector3 = new Vector3_PrivacyModDetection(this);
         vector4 = new Vector4_ResourcePackAltDetection(this);
+        vector5 = new Vector5_BaritoneBehaviorDetection(this);
         commands = new Commands(this);
         configDialogManager = new ConfigDialogManager(this);
         playerInventoryManager = new PlayerInventoryManager(this);
@@ -73,7 +75,9 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(vector2, this);
         getServer().getPluginManager().registerEvents(vector3, this);
+        getServer().getPluginManager().registerEvents(vector5, this);
         getServer().getPluginManager().registerEvents(playerInventoryManager, this);
+        vector5.initializeGrimCorrelation();
 
         // Register commands
         getCommand("lovelyspy").setExecutor(commands);
@@ -98,6 +102,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         vector1.cleanup();
         vector3.cleanup();
         vector4.cleanup();
+        vector5.cleanup();
 
         getLogger().info("LovelySpy Client Detection Engine successfully disabled!");
     }
@@ -223,7 +228,10 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         }
 
         String confidence;
-        if (evidenceKey.equals("sign_packet_blocked")) confidence = "INCONCLUSIVE";
+        if (evidenceKey.equals("sign_packet_blocked")
+                || vectorName.contains("Strict Unverifiable-Client Policy")) {
+            confidence = "INCONCLUSIVE";
+        } else if (vectorName.contains("Baritone Behavioral Correlation")) confidence = "MEDIUM";
         else if (vectorName.contains("Translation Fingerprinting")) confidence = "HIGH";
         else if (action.equalsIgnoreCase("BAN")) confidence = "CRITICAL";
         else if (action.equalsIgnoreCase("KICK")) confidence = "HIGH";
