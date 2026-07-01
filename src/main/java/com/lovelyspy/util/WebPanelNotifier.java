@@ -15,6 +15,7 @@ public final class WebPanelNotifier {
     private final Gson gson = new Gson();
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
     public WebPanelNotifier(LovelySpyPlugin plugin) {
