@@ -16,6 +16,7 @@ public final class Vector3_PrivacyModDetection implements Listener {
     private final Map<UUID, Integer> unsignedMessageCount = new ConcurrentHashMap<>();
     private final Map<UUID, Long> packSentTimes = new ConcurrentHashMap<>();
     private final Map<UUID, Long> packAcceptTimes = new ConcurrentHashMap<>();
+    private final Set<UUID> flaggedResourcePackSpoof = ConcurrentHashMap.newKeySet();
 
     public Vector3_PrivacyModDetection(LovelySpyPlugin plugin) {
         this.plugin = plugin;
@@ -30,9 +31,14 @@ public final class Vector3_PrivacyModDetection implements Listener {
     }
 
     public void flagKeyResolutionShield(Player player, String evidence, String checker) {
+        boolean resourcePackSpoofed = flaggedResourcePackSpoof.contains(player.getUniqueId());
+        String vectorName = "Vector 3 (OpSec / ExploitPreventer Key-Resolution Shield)";
+        if (resourcePackSpoofed) {
+            vectorName += " [CONFIRMED: Resource Pack Spoof Correlated]";
+        }
         plugin.executeDetection(player, "opsec_key_resolution_blocked",
-                "Repeated vanilla key-resolution block: " + evidence,
-                "Vector 3 (OpSec / ExploitPreventer Key-Resolution Shield)", checker);
+                "Repeated vanilla key-resolution block: " + evidence + (resourcePackSpoofed ? " | Correlated with instant resource pack accept" : ""),
+                vectorName, checker);
     }
 
     public void flagSignTimeout(Player player) {
@@ -96,6 +102,7 @@ public final class Vector3_PrivacyModDetection implements Listener {
                 long duration = System.currentTimeMillis() - sentTime;
                 packAcceptTimes.put(uuid, System.currentTimeMillis());
                 if (duration < 15) { // Physically impossible for normal clients
+                    flaggedResourcePackSpoof.add(uuid);
                     plugin.executeDetection(player, "resource_pack_spoof_accept", 
                             "Accepted resource pack in " + duration + "ms (Auto-Accept Spoof)", "Vector 3 (Resource Pack Spoof)");
                 }
@@ -115,11 +122,13 @@ public final class Vector3_PrivacyModDetection implements Listener {
         unsignedMessageCount.remove(uuid);
         packSentTimes.remove(uuid);
         packAcceptTimes.remove(uuid);
+        flaggedResourcePackSpoof.remove(uuid);
     }
 
     public void cleanup() {
         unsignedMessageCount.clear();
         packSentTimes.clear();
         packAcceptTimes.clear();
+        flaggedResourcePackSpoof.clear();
     }
 }

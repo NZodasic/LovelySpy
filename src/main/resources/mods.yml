@@ -204,7 +204,7 @@ mods:
     vector: unverifiable_client
     action: BAN
     message: "Unverifiable modded client: prohibited-mod scan may be shielded"
-    enabled: false
+    enabled: true
 
   # Official standalone Baritone 1.21.11 has no translation/keybind/channel
   # fingerprint. This entry is fed only by correlated behavior plus GrimAC

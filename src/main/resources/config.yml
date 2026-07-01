@@ -10,6 +10,12 @@ privacy_control_keys:          # Vanilla keys that must resolve on normal client
   - "key.forward"
   - "key.jump"
   - "key.attack"
+  - "key.left"
+  - "key.right"
+  - "key.back"
+  - "key.sneak"
+  - "key.sprint"
+  - "key.use"
 
 # Standalone Baritone exposes no stable brand, channel, keybind, or translation
 # signature. This detector therefore correlates repeated automation-like motion
@@ -23,7 +29,7 @@ baritone-behavior:
   detection-cooldown-seconds: 300
   
 auto-check-on-join:
-  enabled: false
+  enabled: true
   only-first-join: false
 
 # Mod/client detection entries are stored separately in mods.yml
