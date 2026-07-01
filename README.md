@@ -105,6 +105,8 @@ The plugin comes pre-configured with detection rules for popular client packages
 
 Meteor Client uses confirmed current keybind/category translations from its own namespace. Existing installations that still contain the obsolete `meteor-client.gui.tabs.mods` key are migrated automatically when the mod catalogue loads. A confirmed mod produces one action and one offense regardless of how many of its keys matched.
 
+On Minecraft 1.21.11, probe signs are built through Paper's typed virtual-sign API. This is required because modern block-entity data stores structured text components; placing JSON inside legacy NBT string tags makes the JSON itself visible and creates an invalid mass-positive scan.
+
 ---
 
 ## 🖥️ Web Panel Sync Configuration (`Spy-Monitor`)
