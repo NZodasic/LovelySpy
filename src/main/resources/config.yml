@@ -7,6 +7,9 @@ probe_batch_delay_ticks: 20    # Pace sign responses; avoids packet-funnel false
 sign_close_delay_ticks: 5      # Close hidden sign after render; min 3 ticks to avoid corrupt responses
 canary_key: "key.forward"      # Primary vanilla control key; kept for older configs/GUI
 privacy_control_keys:          # Vanilla keys that must resolve on normal clients
+  - "gui.done"
+  - "gui.cancel"
+  - "menu.options"
   - "key.forward"
   - "key.jump"
   - "key.attack"
