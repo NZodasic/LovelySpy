@@ -123,6 +123,10 @@ public final class Vector1_TranslationFingerprint {
 
         // Check if response is suspiciously fast (GUI bypass / OpSec / ExploitPreventer)
         long duration = System.currentTimeMillis() - session.getStartTime();
+        
+        // Feed to Vector9 Behavioral Paradox Engine for latency analysis
+        plugin.getVector9().recordSignProbeLatency(player, duration);
+        
         long closeDelayMs = plugin.getLovelyConfig().signCloseDelayTicks * 50L;
         long threshold = Math.max(100L, closeDelayMs - 70L);
         if (duration < threshold && !player.hasPermission("lovelyspy.bypass")) {
@@ -155,12 +159,21 @@ public final class Vector1_TranslationFingerprint {
             String response = lines[i] != null ? lines[i].trim() : "";
             responses.put(key, response);
 
+            // Feed to behavioral consistency detection
+            long probeDuration = System.currentTimeMillis() - session.getStartTime();
+            plugin.getVector7().recordTranslationProbe(player, key, response, probeDuration);
+
             if (!response.isEmpty() && !response.equals(key)) {
                 newFlagged.add(key);
             }
         }
         session.addResponses(responses);
         Map<String, String> allResponses = new LinkedHashMap<>(session.getResponses());
+
+        // Feed post-pack evaluation to Vector9 if we are in a post-pack probe context
+        if (session.isPostPackProbe()) {
+            plugin.getVector9().evaluatePostPackResponse(player, responses);
+        }
 
         // Accumulate flagged keys
         // Keep each signature only once. Duplicate keys in configuration must not

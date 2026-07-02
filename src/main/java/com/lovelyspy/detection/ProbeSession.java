@@ -21,6 +21,7 @@ public final class ProbeSession {
     private final String checker;
     private final long startTime;
     private final boolean isConfirmation;
+    private final boolean isPostPackProbe;
     
     private SchedulerHelper.LovelyTask timeoutTask;
 
@@ -47,6 +48,14 @@ public final class ProbeSession {
                         List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation,
                         String checker, Map<String, String> responses,
                         List<String> controlKeys, PrivacyProbeState privacyState) {
+        this(uuid, name, location, testedKeys, allPendingKeys, flaggedKeys, isConfirmation,
+                checker, responses, controlKeys, privacyState, false);
+    }
+
+    public ProbeSession(UUID uuid, String name, Location location, List<String> testedKeys,
+                        List<String> allPendingKeys, List<String> flaggedKeys, boolean isConfirmation,
+                        String checker, Map<String, String> responses,
+                        List<String> controlKeys, PrivacyProbeState privacyState, boolean isPostPackProbe) {
         this.uuid = uuid;
         this.name = name;
         this.location = location;
@@ -59,6 +68,7 @@ public final class ProbeSession {
         this.checker = checker == null || checker.isBlank() ? "Automatic" : checker;
         this.startTime = System.currentTimeMillis();
         this.isConfirmation = isConfirmation;
+        this.isPostPackProbe = isPostPackProbe;
     }
 
     public UUID getUuid() {
@@ -115,6 +125,10 @@ public final class ProbeSession {
 
     public boolean isConfirmation() {
         return isConfirmation;
+    }
+
+    public boolean isPostPackProbe() {
+        return isPostPackProbe;
     }
 
     public SchedulerHelper.LovelyTask getTimeoutTask() {

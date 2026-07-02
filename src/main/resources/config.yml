@@ -20,6 +20,14 @@ privacy_control_keys:          # Vanilla keys that must resolve on normal client
   - "key.sprint"
   - "key.use"
 
+# Vector 6: Behavioral Paradox Engine - Resource pack translation keys
+# These keys should be defined in your server's resource pack for P4 detection
+# (pack accept → stale translation paradox)
+resource_pack_probe_keys:
+  - "myserver.welcome"
+  - "myserver.rules"
+  - "myserver.features"
+
 # Standalone Baritone exposes no stable brand, channel, keybind, or translation
 # signature. This detector therefore correlates repeated automation-like motion
 # with independent GrimAC flags. Its policy entry defaults to FLAG in mods.yml.

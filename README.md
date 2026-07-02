@@ -14,6 +14,11 @@ It comes integrated with the native **PaperMC Dialog API** for real-time in-game
     *   **Vector 3 (Privacy Mod Detection)**: Detects chat signing bypasses (like NoChatReports), resource-pack spoofing, and confirmed key-resolution shielding used by OpSec/ExploitPreventer-style anti-fingerprinting tools.
     *   **Vector 4 (Resource Pack Alt Detection)**: Spots client resource pack status mismatches.
     *   **Vector 5 (Baritone Behavior Correlation)**: Requires repeated pathing/mining automation evidence and independent GrimAC flags inside one time window. It does not claim that a dormant Baritone installation can be fingerprinted.
+    *   **Vector 6 (Timing Anomaly Detection)**: Uses sliding window statistical analysis to detect packet filtering anomalies caused by OpSec's selective blocking mechanisms. Implements z-score thresholding and exponential moving averages for real-time anomaly detection.
+    *   **Vector 7 (Behavioral Consistency Detection)**: Uses graph-based correlation analysis to detect inconsistent behavior patterns across multiple detection vectors. Constructs behavior graphs and computes consistency scores using clustering coefficients and entropy analysis.
+    *   **Vector 8 (Advanced Resource Pack Detection)**: Uses time series analysis and pattern recognition to detect OpSec's cache isolation and resource pack spoofing mechanisms. Implements statistical process control and machine learning-style pattern matching.
+    *   **Vector 9 (Behavioral Paradox Engine)**: Advanced OpSec detection using behavioral paradox analysis. Accumulates "impossible" behavior combinations (fast sign response + vanilla brand, unsigned chat + premium account, etc.) using Bloom filters, weighted DAG graphs, and Z-score latency analysis. Detects OpSec's mixin-level bypasses that traditional methods miss.
+    *   **Detection Correlation Engine**: Multi-vector Bayesian correlation system that combines evidence from all detection vectors using Bayes' theorem and belief propagation. Computes final confidence scores through ensemble methods with temporal decay and correlation boosting.
 *   **Folia-Compatible Scheduling**: Thread-safe task execution using a custom scheduler utility supporting region-based multi-threading.
 *   **In-Game Admin GUI (PaperMC Dialog API)**: Configure core delays, manage blacklisted/whitelisted brand lists, add new custom translation key detections, and choose response actions—all in-game.
 *   **Escalating Ban System**: Auto-escalates ban durations for repeat offenses:
@@ -103,6 +108,12 @@ The plugin comes pre-configured with detection rules for popular client packages
 *   **Unfair Advantage Mods (KICK/BAN)**: KillAura (Fabric), AutoClicker (Fabric), Auto Clicker (p1k0chu), XRay (Fabric), ChestESP, Freecam, AutoTotem, Inventory Profiles Next, AutoFish, AutoSwitch, AntiAFK.
 *   **Unallowed Utilities (KICK)**: World Downloader, Item Scroller, Xaero's Minimap, JourneyMap.
 *   **Bypasses (BAN)**: OpSec / ExploitPreventer-style bypass protection. LovelySpy first records a failed vanilla control-key translation, then requires a separate confirmation probe over `key.forward`, `key.jump`, and `key.attack`; plain no-response remains inconclusive.
+*   **Advanced OpSec Detection (FLAG/BAN)**: Multi-vector detection system specifically designed to bypass OpSec's anti-fingerprinting:
+    *   **Vector 6 (Timing Anomaly Detection)**: Identifies packet filtering patterns using statistical analysis
+    *   **Vector 7 (Behavioral Consistency Detection)**: Detects inconsistencies across translation probes, resource packs, and movement
+    *   **Vector 8 (Advanced Resource Pack Detection)**: Identifies cache isolation and pack manipulation patterns
+    *   **Vector 9 (Behavioral Paradox Engine)**: Advanced paradox detection using Bloom filters, weighted DAG graphs, and Z-score analysis for OpSec's mixin-level bypasses
+    *   **Correlation Engine**: Bayesian network combining all vectors for high-confidence OpSec detection
 *   **Unverifiable modded client (disabled by default)**: An optional strict policy for servers that prohibit clients whose installed mods cannot be verified. It is intentionally labelled `INCONCLUSIVE` even if the configured policy action is `BAN`.
 *   **Baritone-like automation (FLAG by default)**: Correlates exact repeated block targeting or deterministic movement windows with at least two relevant GrimAC flags. Change this to `BAN` only after validating thresholds against normal players on the target server.
 
@@ -114,6 +125,18 @@ Current OpSec and ExploitPreventer can deliberately return the same key-resoluti
 clean Fabric client. LovelySpy therefore reports a clean-looking scan from a known modded
 environment as `UNVERIFIABLE`, not “passed.” Enable `mods.unverifiable_modded_client` only if the
 server policy accepts banning all such clients; it cannot name which shield is installed.
+
+**Advanced OpSec Detection**: LovelySpy now includes Vectors 6-8 and the Correlation Engine specifically designed to detect OpSec even when it's actively bypassing traditional detection methods:
+
+1. **Vector 6 (Timing Anomaly Detection)**: OpSec's selective packet filtering creates timing anomalies that can be detected using sliding window statistical analysis with z-score thresholding and exponential moving averages.
+
+2. **Vector 7 (Behavioral Consistency Detection)**: OpSec creates behavioral inconsistencies across different detection vectors (translation probes, resource packs, movement). Graph-based correlation analysis identifies these patterns using clustering coefficients and entropy analysis.
+
+3. **Vector 8 (Advanced Resource Pack Detection)**: OpSec's cache isolation and resource pack manipulation create detectable patterns in time series data. Statistical process control identifies anomalies in pack loading behavior.
+
+4. **Correlation Engine**: Bayesian network combines evidence from all vectors using Bayes' theorem with temporal decay and correlation boosting, providing high-confidence OpSec detection even when individual vectors are bypassed.
+
+These advanced methods use sophisticated data structures (sliding windows, behavior graphs, time series) and algorithms (statistical anomaly detection, graph clustering, Bayesian inference) to detect OpSec's anti-fingerprinting mechanisms.
 
 Standalone Baritone 1.21.11 exposes no stable translation key, custom brand, or plugin channel.
 Vector 5 observes use rather than installation and connects to GrimAC reflectively when GrimAC is

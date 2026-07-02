@@ -36,6 +36,11 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private Vector3_PrivacyModDetection vector3;
     private Vector4_ResourcePackAltDetection vector4;
     private Vector5_BaritoneBehaviorDetection vector5;
+    private Vector6_TimingAnomalyDetection vector6;
+    private Vector7_BehavioralConsistencyDetection vector7;
+    private Vector8_AdvancedResourcePackDetection vector8;
+    private Vector9_BehavioralParadoxEngine vector9;
+    private DetectionCorrelationEngine correlationEngine;
     private Commands commands;
     private ConfigDialogManager configDialogManager;
     private DiscordBotNotifier discordBotNotifier;
@@ -67,6 +72,11 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         vector3 = new Vector3_PrivacyModDetection(this);
         vector4 = new Vector4_ResourcePackAltDetection(this);
         vector5 = new Vector5_BaritoneBehaviorDetection(this);
+        vector6 = new Vector6_TimingAnomalyDetection(this);
+        vector7 = new Vector7_BehavioralConsistencyDetection(this);
+        vector8 = new Vector8_AdvancedResourcePackDetection(this);
+        vector9 = new Vector9_BehavioralParadoxEngine(this);
+        correlationEngine = new DetectionCorrelationEngine(this);
         commands = new Commands(this);
         configDialogManager = new ConfigDialogManager(this);
         playerInventoryManager = new PlayerInventoryManager(this);
@@ -76,6 +86,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(vector2, this);
         getServer().getPluginManager().registerEvents(vector3, this);
         getServer().getPluginManager().registerEvents(vector5, this);
+        getServer().getPluginManager().registerEvents(vector9, this);
         getServer().getPluginManager().registerEvents(playerInventoryManager, this);
         vector5.initializeGrimCorrelation();
 
@@ -103,6 +114,11 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         vector3.cleanup();
         vector4.cleanup();
         vector5.cleanup();
+        vector6.cleanup();
+        vector7.cleanup();
+        vector8.cleanup();
+        vector9.cleanup();
+        correlationEngine.cleanup();
 
         getLogger().info("LovelySpy Client Detection Engine successfully disabled!");
     }
@@ -128,9 +144,14 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
         ejectPlayer(player);
-        vector1.handleQuit(player.getUniqueId());
-        vector2.removeProfile(player.getUniqueId());
+        vector1.handleQuit(uuid);
+        vector2.removeProfile(uuid);
+        vector6.cleanupPlayer(uuid);
+        vector7.cleanupPlayer(uuid);
+        vector8.cleanupPlayer(uuid);
+        correlationEngine.cleanupPlayer(uuid);
     }
 
     private void injectPlayer(Player player) {
@@ -233,10 +254,24 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             confidence = "INCONCLUSIVE";
         } else if (vectorName.contains("Baritone Behavioral Correlation")) confidence = "MEDIUM";
         else if (vectorName.contains("Translation Fingerprinting")) confidence = "HIGH";
+        else if (vectorName.contains("Timing Anomaly")) confidence = "MEDIUM";
+        else if (vectorName.contains("Behavioral Consistency")) confidence = "MEDIUM";
+        else if (vectorName.contains("Advanced Resource Pack")) confidence = "MEDIUM";
+        else if (vectorName.contains("Correlation Engine")) confidence = "CRITICAL";
         else if (action.equalsIgnoreCase("BAN")) confidence = "CRITICAL";
         else if (action.equalsIgnoreCase("KICK")) confidence = "HIGH";
         else if (action.equalsIgnoreCase("FLAG")) confidence = "MEDIUM";
         else confidence = "LOW";
+
+        // Feed to correlation engine for multi-vector analysis
+        double confidenceValue = switch (confidence) {
+            case "CRITICAL" -> 0.95;
+            case "HIGH" -> 0.80;
+            case "MEDIUM" -> 0.60;
+            case "LOW" -> 0.40;
+            default -> 0.20;
+        };
+        correlationEngine.recordDetection(player, vectorName, evidenceKey, evidenceText, confidenceValue);
 
         // Log result
         Logger.LogEntry logEntry = loggerService.log(player.getUniqueId(), player.getName(),
@@ -475,6 +510,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     // Packet interceptor logic using Netty ChannelDuplexHandler
     private class PlayerPacketHandler extends io.netty.channel.ChannelDuplexHandler {
         private final Player player;
+        private final Map<String, Long> packetTimestamps = new HashMap<>();
 
         public PlayerPacketHandler(Player player) {
             this.player = player;
@@ -482,8 +518,10 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
         @Override
         public void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object msg) throws Exception {
+            long startTime = System.nanoTime();
+            String name = msg.getClass().getSimpleName();
+            
             try {
-                String name = msg.getClass().getSimpleName();
                 if (name.equals("ServerboundSignUpdatePacket")
                         && vector1.isProbing(player.getUniqueId())) {
                     java.lang.reflect.Method getLinesMethod = msg.getClass().getMethod("getLines");
@@ -495,7 +533,18 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
                     return; // consume packet
                 } else if (name.equals("ServerboundChatPacket")) {
                     vector3.handleChatPacket(player, msg);
+                    
+                    // Feed to behavioral consistency detection
+                    Map<String, Object> chatAttributes = new HashMap<>();
+                    chatAttributes.put("packet_type", "chat");
+                    chatAttributes.put("timestamp", System.currentTimeMillis());
+                    vector7.recordBehavior(player, "chat_packet", chatAttributes);
                 }
+                
+                // Record timing for all packets (Vector 6)
+                long duration = System.nanoTime() - startTime;
+                vector6.recordPacketTiming(player, name, duration);
+
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -504,10 +553,30 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
         @Override
         public void write(io.netty.channel.ChannelHandlerContext ctx, Object msg, io.netty.channel.ChannelPromise promise) throws Exception {
-            if (msg.getClass().getSimpleName().equals("ClientboundResourcePackPushPacket")) {
+            String name = msg.getClass().getSimpleName();
+            
+            if (name.equals("ClientboundResourcePackPushPacket")) {
                 vector3.recordPackSent(player.getUniqueId());
+                
+                // Extract pack info for advanced detection (Vector 8)
+                try {
+                    java.lang.reflect.Method getUrlMethod = msg.getClass().getMethod("getUrl");
+                    String url = (String) getUrlMethod.invoke(msg);
+                    java.lang.reflect.Method getHashMethod = msg.getClass().getMethod("getHash");
+                    String hash = (String) getHashMethod.invoke(msg);
+                    vector8.recordPackSend(player, url, hash);
+                } catch (Exception ignored) {}
             }
+            
+            // Record packet timing (Vector 6)
+            long startTime = System.nanoTime();
+            packetTimestamps.put(name, startTime);
+            
             super.write(ctx, msg, promise);
+            
+            // Calculate timing after write
+            long duration = System.nanoTime() - startTime;
+            vector6.recordPacketTiming(player, name + "_outbound", duration);
         }
     }
 
@@ -553,5 +622,29 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
     public Vector4_ResourcePackAltDetection getVector4() {
         return vector4;
+    }
+
+    public Vector5_BaritoneBehaviorDetection getVector5() {
+        return vector5;
+    }
+
+    public Vector6_TimingAnomalyDetection getVector6() {
+        return vector6;
+    }
+
+    public Vector7_BehavioralConsistencyDetection getVector7() {
+        return vector7;
+    }
+
+    public Vector8_AdvancedResourcePackDetection getVector8() {
+        return vector8;
+    }
+
+    public Vector9_BehavioralParadoxEngine getVector9() {
+        return vector9;
+    }
+
+    public DetectionCorrelationEngine getCorrelationEngine() {
+        return correlationEngine;
     }
 }

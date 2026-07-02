@@ -103,6 +103,11 @@ public final class Vector3_PrivacyModDetection implements Listener {
             if (!hasSignature) {
                 int count = unsignedMessageCount.getOrDefault(player.getUniqueId(), 0) + 1;
                 unsignedMessageCount.put(player.getUniqueId(), count);
+                
+                // Feed to Vector9 Behavioral Paradox Engine for unsigned chat paradox
+                plugin.getVector9().recordSignal(player, 
+                    Vector9_BehavioralParadoxEngine.Signal.UNSIGNED_CHAT_PREMIUM_ACCOUNT);
+                
                 if (count >= 3) {
                     plugin.executeDetection(player, "no_chat_reports", "Sent 3+ unsigned chat messages with signing capability", "Vector 3 (NoChatReports/OpSec)");
                 }
@@ -123,6 +128,16 @@ public final class Vector3_PrivacyModDetection implements Listener {
             if (sentTime != null) {
                 long duration = System.currentTimeMillis() - sentTime;
                 packAcceptTimes.put(uuid, System.currentTimeMillis());
+                
+                // Feed to advanced resource pack detection
+                plugin.getVector8().recordPackAccept(player, duration);
+                
+                // Feed to behavioral consistency detection
+                Map<String, Object> packAttributes = new HashMap<>();
+                packAttributes.put("action", "ACCEPTED");
+                packAttributes.put("duration", duration);
+                plugin.getVector7().recordResourcePackBehavior(player, "ACCEPTED", duration);
+                
                 if (duration < 15) { // Physically impossible for normal clients
                     flaggedResourcePackSpoof.add(uuid);
                     plugin.executeDetection(player, "resource_pack_spoof_accept", 
@@ -134,7 +149,20 @@ public final class Vector3_PrivacyModDetection implements Listener {
             if (acceptTime != null) {
                 long duration = System.currentTimeMillis() - acceptTime;
                 plugin.getVector4().recordPackLoaded(player, duration);
+                
+                // Feed to advanced resource pack detection
+                plugin.getVector8().recordPackLoad(player, duration, true);
+                
+                // Feed to Vector9 for post-pack translation probe scheduling
+                List<String> packKeys = plugin.getLovelyConfig().resourcePackProbeKeys;
+                if (packKeys != null && !packKeys.isEmpty()) {
+                    plugin.getVector9().schedulePostPackTranslationProbe(player, packKeys);
+                }
             }
+        } else if (status == PlayerResourcePackStatusEvent.Status.DECLINED || 
+                   status == PlayerResourcePackStatusEvent.Status.FAILED_DOWNLOAD) {
+            // Feed to advanced resource pack detection
+            plugin.getVector8().recordPackDecline(player, status.name());
         }
     }
 

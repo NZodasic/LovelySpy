@@ -195,6 +195,34 @@ mods:
     action: BAN
     message: "Bypass Detected: OpSec / ExploitPreventer-style key-resolution protection"
 
+  # Advanced OpSec detection via timing anomalies
+  opsec_timing_anomaly:
+    vector: timing_anomaly
+    action: FLAG
+    message: "OpSec detected: Timing anomaly patterns consistent with packet filtering"
+    enabled: true
+
+  # Advanced OpSec detection via behavioral inconsistencies
+  opsec_behavioral_inconsistency:
+    vector: behavioral_consistency
+    action: FLAG
+    message: "OpSec detected: Behavioral inconsistencies across multiple detection vectors"
+    enabled: true
+
+  # Advanced OpSec detection via resource pack patterns
+  opsec_resource_pack_pattern:
+    vector: resource_pack_pattern
+    action: FLAG
+    message: "OpSec detected: Resource pack manipulation patterns (cache isolation)"
+    enabled: true
+
+  # Multi-vector correlation detection for OpSec
+  opsec_correlation:
+    vector: correlation_engine
+    action: BAN
+    message: "OpSec detected: High-confidence multi-vector correlation analysis"
+    enabled: true
+
   # Opt-in strict policy. Current OpSec/ExploitPreventer can make a prohibited
   # mod's translation response identical to a clean Fabric response, so this
   # cannot identify the shield by name. Enabling it bans every modded client

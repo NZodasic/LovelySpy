@@ -35,6 +35,7 @@ public class Config {
     public int baritoneDetectionCooldownSeconds;
     public String canaryKey;
     public List<String> privacyControlKeys;
+    public List<String> resourcePackProbeKeys;
     public boolean autoCheckOnJoinEnabled;
     public boolean autoCheckOnlyFirstJoin;
     public Map<String, ModEntry> modEntries = new LinkedHashMap<>();
@@ -95,6 +96,7 @@ public class Config {
         canaryKey = privacyControlKeys.getFirst();
         yaml.set("canary_key", canaryKey);
         yaml.set("privacy_control_keys", privacyControlKeys);
+        yaml.set("resource_pack_probe_keys", resourcePackProbeKeys);
         yaml.set("auto-check-on-join.enabled", autoCheckOnJoinEnabled);
         yaml.set("auto-check-on-join.only-first-join", autoCheckOnlyFirstJoin);
         yaml.set("known_cheat_brands", knownCheatBrands);
@@ -218,6 +220,7 @@ public class Config {
         privacyControlKeys = normalizePrivacyControlKeys(canaryKey,
                 yaml.getStringList("privacy_control_keys"));
         canaryKey = privacyControlKeys.getFirst();
+        resourcePackProbeKeys = yaml.getStringList("resource_pack_probe_keys");
         autoCheckOnJoinEnabled = yaml.getBoolean("auto-check-on-join.enabled", false);
         autoCheckOnlyFirstJoin = yaml.getBoolean("auto-check-on-join.only-first-join", false);
         knownCheatBrands = yaml.getStringList("known_cheat_brands");

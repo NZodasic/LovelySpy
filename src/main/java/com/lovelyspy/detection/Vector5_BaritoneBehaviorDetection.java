@@ -101,6 +101,10 @@ public final class Vector5_BaritoneBehaviorDetection implements Listener {
             return;
         }
 
+        // Feed to behavioral consistency detection
+        plugin.getVector7().recordMovementBehavior(player, event.getTo().getX(), 
+                event.getTo().getY(), event.getTo().getZ(), event.getTo().getYaw(), event.getTo().getPitch());
+
         PlayerState state = states.computeIfAbsent(player.getUniqueId(), ignored -> new PlayerState());
         if (state.recordMovement(event.getFrom(), event.getTo(), dx, dz)) {
             state.evidence.recordMovementPattern(System.currentTimeMillis());

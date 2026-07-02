@@ -101,6 +101,9 @@ public final class Vector2_BrandChannelAnalysis implements Listener {
                 }
             }
         }
+
+        // Feed to Vector9 Behavioral Paradox Engine for brand/channel analysis
+        plugin.getVector9().analyzeClientProfile(player, brand, channels);
     }
 
     private String describeMismatch(String brand, String channel) {
