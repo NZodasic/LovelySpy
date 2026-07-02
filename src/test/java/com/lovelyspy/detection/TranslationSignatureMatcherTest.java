@@ -22,6 +22,9 @@ public final class TranslationSignatureMatcherTest {
         meteorProbeComponentsFitExploitFixerLimit();
         packetArrivalTimestampExcludesSchedulerDelay();
         responseDurationNeverBecomesNegative();
+        timingAnomaliesRequireABurst();
+        timingAnomalyAlertsRespectCooldown();
+        staleTimingAnomaliesExpire();
         baritoneBehaviorAloneIsInsufficient();
         grimFlagsAloneAreInsufficient();
         centeredTargetsAndGrimFlagsCorrelate();
@@ -90,6 +93,46 @@ public final class TranslationSignatureMatcherTest {
     private static void responseDurationNeverBecomesNegative() {
         long duration = Vector1_TranslationFingerprint.responseDuration(1_001L, 1_000L);
         assertEquals(0L, duration);
+    }
+
+    private static void timingAnomaliesRequireABurst() {
+        Vector6_TimingAnomalyDetection.AlertGate gate =
+                new Vector6_TimingAnomalyDetection.AlertGate(3, 1_000L, 5_000L);
+
+        assertCondition(!gate.record(true, 0L).shouldAlert(),
+                "One timing outlier must not alert");
+        assertCondition(!gate.record(true, 100L).shouldAlert(),
+                "Two timing outliers must not alert");
+        Vector6_TimingAnomalyDetection.AlertGate.Decision decision =
+                gate.record(true, 200L);
+        assertCondition(decision.shouldAlert(),
+                "The configured timing-outlier burst should alert once");
+        assertEquals(3, decision.evidenceCount());
+    }
+
+    private static void timingAnomalyAlertsRespectCooldown() {
+        Vector6_TimingAnomalyDetection.AlertGate gate =
+                new Vector6_TimingAnomalyDetection.AlertGate(2, 10_000L, 5_000L);
+
+        gate.record(true, 0L);
+        assertCondition(gate.record(true, 1L).shouldAlert(),
+                "Initial timing burst should alert");
+        gate.record(true, 100L);
+        assertCondition(!gate.record(true, 101L).shouldAlert(),
+                "Timing burst inside cooldown must not alert again");
+        assertCondition(gate.record(true, 5_001L).shouldAlert(),
+                "Accumulated evidence may alert after cooldown");
+    }
+
+    private static void staleTimingAnomaliesExpire() {
+        Vector6_TimingAnomalyDetection.AlertGate gate =
+                new Vector6_TimingAnomalyDetection.AlertGate(2, 100L, 0L);
+
+        gate.record(true, 0L);
+        assertCondition(!gate.record(true, 101L).shouldAlert(),
+                "Expired timing evidence must not contribute to a burst");
+        assertCondition(gate.record(true, 102L).shouldAlert(),
+                "Fresh timing evidence inside the window should alert");
     }
 
     private static void baritoneBehaviorAloneIsInsufficient() {

@@ -553,8 +553,8 @@ In `mods.yml`, the following entries control advanced OpSec detection:
 ```yaml
 opsec_timing_anomaly:
   vector: timing_anomaly
-  action: FLAG  # Change to BAN for stricter enforcement
-  enabled: true
+  action: FLAG
+  enabled: false  # Experimental server-runtime heuristic; noisy on production servers
 
 opsec_behavioral_inconsistency:
   vector: behavioral_consistency
@@ -578,6 +578,9 @@ opsec_correlation:
 - `WINDOW_SIZE = 50`: Number of timing samples to analyze
 - `Z_SCORE_THRESHOLD = 3.0`: Sensitivity for anomaly detection
 - `EMA_ALPHA = 0.2`: Exponential moving average smoothing factor
+- `ANOMALIES_REQUIRED = 8`: Outliers required inside one evidence window
+- `ANOMALY_BURST_WINDOW_MS = 10000`: Evidence aggregation window
+- `ALERT_COOLDOWN_MS = 120000`: Minimum delay between alerts per player
 
 **Vector 7 Thresholds** (in code):
 - `MIN_CONSISTENCY_SCORE = 0.6`: Minimum behavioral consistency

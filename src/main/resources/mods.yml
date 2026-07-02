@@ -205,8 +205,10 @@ mods:
   opsec_timing_anomaly:
     vector: timing_anomaly
     action: FLAG
-    message: "OpSec detected: Timing anomaly patterns consistent with packet filtering"
-    enabled: true
+    message: "Repeated server packet-timing outliers (experimental heuristic)"
+    # Server-side handler runtime is noisy and is not direct client evidence.
+    # The dedicated sign-GUI response timer remains enabled through the opsec policy.
+    enabled: false
 
   # Advanced OpSec detection via behavioral inconsistencies
   opsec_behavioral_inconsistency:

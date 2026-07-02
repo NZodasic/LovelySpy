@@ -1,6 +1,7 @@
 package com.lovelyspy.detection;
 
 import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.config.Config;
 import org.bukkit.entity.Player;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,6 +24,9 @@ public final class Vector6_TimingAnomalyDetection {
     private static final int WINDOW_SIZE = 50;
     private static final double Z_SCORE_THRESHOLD = 3.0;
     private static final double EMA_ALPHA = 0.2;
+    private static final int ANOMALIES_REQUIRED = 8;
+    private static final long ANOMALY_BURST_WINDOW_MS = 10_000L;
+    private static final long ALERT_COOLDOWN_MS = 120_000L;
     
     private final LovelySpyPlugin plugin;
     private final Map<UUID, TimingWindow> timingWindows = new ConcurrentHashMap<>();
@@ -35,7 +39,7 @@ public final class Vector6_TimingAnomalyDetection {
      * Records a packet timing sample for anomaly detection
      */
     public void recordPacketTiming(Player player, String packetType, long durationNanos) {
-        if (player.hasPermission("lovelyspy.bypass")) return;
+        if (player.hasPermission("lovelyspy.bypass") || !isTimingDetectionEnabled()) return;
         
         UUID uuid = player.getUniqueId();
         TimingWindow window = timingWindows.computeIfAbsent(uuid, k -> new TimingWindow());
@@ -45,8 +49,10 @@ public final class Vector6_TimingAnomalyDetection {
         // Check for anomalies after sufficient samples
         if (window.getSampleCount() >= WINDOW_SIZE) {
             AnomalyResult result = window.detectAnomalies();
-            if (result.hasAnomaly()) {
-                handleAnomaly(player, result);
+            AlertGate.Decision decision =
+                    window.anomalyGate.record(result.hasAnomaly(), System.currentTimeMillis());
+            if (decision.shouldAlert()) {
+                handleAnomaly(player, result, decision.evidenceCount());
             }
         }
     }
@@ -55,7 +61,7 @@ public final class Vector6_TimingAnomalyDetection {
      * Records a blocked packet for pattern analysis
      */
     public void recordBlockedPacket(Player player, String packetType) {
-        if (player.hasPermission("lovelyspy.bypass")) return;
+        if (player.hasPermission("lovelyspy.bypass") || !isTimingDetectionEnabled()) return;
         
         UUID uuid = player.getUniqueId();
         TimingWindow window = timingWindows.computeIfAbsent(uuid, k -> new TimingWindow());
@@ -63,10 +69,11 @@ public final class Vector6_TimingAnomalyDetection {
         window.recordBlockedPacket(packetType);
         
         // Check if blocking pattern matches OpSec signature
-        if (window.matchesOpSecBlockingPattern()) {
-            plugin.executeDetection(player, "opsec_blocking_pattern",
+        if (window.matchesOpSecBlockingPattern()
+                && window.blockingAlertGate.tryAcquire(System.currentTimeMillis())) {
+            executeTimingDetection(player, "opsec_blocking_pattern",
                     "Detected OpSec-style selective packet blocking pattern",
-                    "Vector 6 (Timing Anomaly - Blocking Pattern)", "Automatic");
+                    "Vector 6 (Timing Anomaly - Blocking Pattern)");
         }
     }
     
@@ -74,27 +81,50 @@ public final class Vector6_TimingAnomalyDetection {
      * Compares timing between different packet types for consistency
      */
     public void analyzeTimingConsistency(Player player) {
-        if (player.hasPermission("lovelyspy.bypass")) return;
+        if (player.hasPermission("lovelyspy.bypass") || !isTimingDetectionEnabled()) return;
         
         UUID uuid = player.getUniqueId();
         TimingWindow window = timingWindows.get(uuid);
         if (window == null || window.getSampleCount() < WINDOW_SIZE) return;
         
         ConsistencyResult result = window.analyzeConsistency();
-        if (!result.isConsistent()) {
-            plugin.executeDetection(player, "timing_inconsistency",
+        if (!result.isConsistent()
+                && window.consistencyAlertGate.tryAcquire(System.currentTimeMillis())) {
+            executeTimingDetection(player, "timing_inconsistency",
                     "Packet timing inconsistency detected: " + result.getInconsistencyReason(),
-                    "Vector 6 (Timing Anomaly - Consistency)", "Automatic");
+                    "Vector 6 (Timing Anomaly - Consistency)");
         }
     }
     
-    private void handleAnomaly(Player player, AnomalyResult result) {
-        String evidence = String.format("Timing anomaly: %s (z-score: %.2f, expected: %.2fns, actual: %.2fns)",
-                result.getPacketType(), result.getZScore(), result.getExpectedValue(), result.getActualValue());
+    private void handleAnomaly(Player player, AnomalyResult result, int evidenceCount) {
+        String evidence = String.format(
+                "Timing anomaly burst: %d outliers within %dms; latest=%s "
+                        + "(z-score: %.2f, expected: %.2fns, actual: %.2fns)",
+                evidenceCount, ANOMALY_BURST_WINDOW_MS, result.getPacketType(),
+                result.getZScore(), result.getExpectedValue(), result.getActualValue());
         
-        plugin.executeDetection(player, "timing_anomaly",
-                evidence,
-                "Vector 6 (Timing Anomaly Detection)", "Automatic");
+        executeTimingDetection(player, "timing_anomaly", evidence,
+                "Vector 6 (Timing Anomaly Detection)");
+    }
+
+    private void executeTimingDetection(Player player, String evidenceKey,
+                                        String evidence, String vectorName) {
+        Config.ModEntry policy = timingPolicy();
+        if (policy == null || !policy.enabled) {
+            return;
+        }
+        plugin.executeModDetection(player, policy, Map.of(evidenceKey, evidence),
+                vectorName, "Automatic");
+    }
+
+    private boolean isTimingDetectionEnabled() {
+        Config.ModEntry policy = timingPolicy();
+        return policy != null && policy.enabled;
+    }
+
+    private Config.ModEntry timingPolicy() {
+        return plugin.getLovelyConfig().findPolicy(
+                "opsec_timing_anomaly", "timing_anomaly");
     }
     
     public void cleanupPlayer(UUID uuid) {
@@ -115,6 +145,10 @@ public final class Vector6_TimingAnomalyDetection {
         private double ema = 0.0;
         private long sum = 0;
         private int count = 0;
+        private final AlertGate anomalyGate = new AlertGate(
+                ANOMALIES_REQUIRED, ANOMALY_BURST_WINDOW_MS, ALERT_COOLDOWN_MS);
+        private final CooldownGate blockingAlertGate = new CooldownGate(ALERT_COOLDOWN_MS);
+        private final CooldownGate consistencyAlertGate = new CooldownGate(ALERT_COOLDOWN_MS);
         
         public void addSample(String packetType, long durationNanos) {
             // Add to main window
@@ -234,6 +268,64 @@ public final class Vector6_TimingAnomalyDetection {
         
         public int getSampleCount() {
             return count;
+        }
+    }
+
+    static final class AlertGate {
+        private final int evidenceRequired;
+        private final long evidenceWindowMs;
+        private final long cooldownMs;
+        private final Deque<Long> evidenceTimes = new ArrayDeque<>();
+        private long lastAlertAt = Long.MIN_VALUE;
+
+        AlertGate(int evidenceRequired, long evidenceWindowMs, long cooldownMs) {
+            this.evidenceRequired = Math.max(1, evidenceRequired);
+            this.evidenceWindowMs = Math.max(1L, evidenceWindowMs);
+            this.cooldownMs = Math.max(0L, cooldownMs);
+        }
+
+        synchronized Decision record(boolean anomalous, long now) {
+            prune(now);
+            if (!anomalous) {
+                return new Decision(false, evidenceTimes.size());
+            }
+            evidenceTimes.addLast(now);
+            int evidenceCount = evidenceTimes.size();
+            boolean cooldownElapsed = lastAlertAt == Long.MIN_VALUE
+                    || now - lastAlertAt >= cooldownMs;
+            if (evidenceCount < evidenceRequired || !cooldownElapsed) {
+                return new Decision(false, evidenceCount);
+            }
+            lastAlertAt = now;
+            evidenceTimes.clear();
+            return new Decision(true, evidenceCount);
+        }
+
+        private void prune(long now) {
+            long oldestAllowed = now - evidenceWindowMs;
+            while (!evidenceTimes.isEmpty() && evidenceTimes.peekFirst() < oldestAllowed) {
+                evidenceTimes.removeFirst();
+            }
+        }
+
+        record Decision(boolean shouldAlert, int evidenceCount) {
+        }
+    }
+
+    private static final class CooldownGate {
+        private final long cooldownMs;
+        private long lastAlertAt = Long.MIN_VALUE;
+
+        private CooldownGate(long cooldownMs) {
+            this.cooldownMs = Math.max(0L, cooldownMs);
+        }
+
+        synchronized boolean tryAcquire(long now) {
+            if (lastAlertAt != Long.MIN_VALUE && now - lastAlertAt < cooldownMs) {
+                return false;
+            }
+            lastAlertAt = now;
+            return true;
         }
     }
     
