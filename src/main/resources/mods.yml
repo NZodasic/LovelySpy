@@ -200,6 +200,7 @@ mods:
     vector: privacy_probe
     action: BAN
     message: "Bypass Detected: OpSec / ExploitPreventer-style key-resolution protection"
+    enabled: true
 
   # Advanced OpSec detection via timing anomalies
   opsec_timing_anomaly:

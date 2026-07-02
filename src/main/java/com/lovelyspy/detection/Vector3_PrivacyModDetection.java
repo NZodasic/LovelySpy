@@ -37,9 +37,25 @@ public final class Vector3_PrivacyModDetection implements Listener {
         if (resourcePackSpoofed) {
             vectorName += " [CONFIRMED: Resource Pack Spoof Correlated]";
         }
-        plugin.executeDetection(player, "opsec_key_resolution_blocked",
-                "Repeated vanilla key-resolution block: " + evidence + (resourcePackSpoofed ? " | Correlated with instant resource pack accept" : ""),
-                vectorName, checker);
+        String fullEvidence = "Repeated vanilla key-resolution block: " + evidence
+                + (resourcePackSpoofed
+                ? " | Correlated with instant resource pack accept"
+                : "");
+        Config.ModEntry opsecPolicy =
+                plugin.getLovelyConfig().findPolicy("opsec", "privacy_probe");
+        if (opsecPolicy != null && opsecPolicy.enabled) {
+            plugin.executeModDetection(player, opsecPolicy,
+                    Map.of("opsec_key_resolution_blocked", fullEvidence),
+                    vectorName, checker);
+        } else if (opsecPolicy != null) {
+            plugin.getLogger().warning("OpSec key-resolution shield detected for "
+                    + player.getName() + ", but the privacy-probe policy is disabled.");
+        } else {
+            plugin.getLogger().severe("OpSec key-resolution shield detected, but no "
+                    + "privacy-probe policy is loaded; recording fallback evidence.");
+            plugin.executeDetection(player, "opsec_key_resolution_blocked",
+                    fullEvidence, vectorName, checker);
+        }
     }
 
     public void flagSignGuiBypass(Player player, long duration, String checker) {
