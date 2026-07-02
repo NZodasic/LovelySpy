@@ -195,6 +195,8 @@ mods:
 
   # Bypassers / anti-fingerprinting tools
   opsec:
+    # Privacy evidence is routed by vector, not sent as translation-probe keys.
+    keys: []
     vector: privacy_probe
     action: BAN
     message: "Bypass Detected: OpSec / ExploitPreventer-style key-resolution protection"

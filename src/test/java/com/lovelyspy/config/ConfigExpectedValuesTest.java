@@ -12,6 +12,8 @@ public final class ConfigExpectedValuesTest {
 
     public static void main(String[] args) throws Exception {
         dottedTranslationKeysSurviveYamlRoundTrip();
+        namedPolicyTakesPriorityOverVectorFallback();
+        vectorPolicyIsUsedWhenNamedPolicyIsAbsent();
     }
 
     private static void dottedTranslationKeysSurviveYamlRoundTrip() throws Exception {
@@ -31,5 +33,32 @@ public final class ConfigExpectedValuesTest {
             throw new AssertionError("Expected literal dotted translation keys "
                     + expected + " but got " + actual);
         }
+    }
+
+    private static void namedPolicyTakesPriorityOverVectorFallback() {
+        Config config = new Config(null);
+        Config.ModEntry fallback = policy("fallback", "privacy_probe");
+        Config.ModEntry named = policy("opsec", "other_vector");
+        config.modEntries.put("fallback", fallback);
+        config.modEntries.put("OpSec", named);
+
+        if (config.findPolicy("opsec", "privacy_probe") != named) {
+            throw new AssertionError("The explicitly named OpSec policy must take priority");
+        }
+    }
+
+    private static void vectorPolicyIsUsedWhenNamedPolicyIsAbsent() {
+        Config config = new Config(null);
+        Config.ModEntry fallback = policy("fallback", "privacy_probe");
+        config.modEntries.put("fallback", fallback);
+
+        if (config.findPolicy("opsec", "privacy_probe") != fallback) {
+            throw new AssertionError("Privacy vector policy should be used as a fallback");
+        }
+    }
+
+    private static Config.ModEntry policy(String name, String vector) {
+        return new Config.ModEntry(name, java.util.List.of(), "BAN",
+                "test policy", vector, true);
     }
 }

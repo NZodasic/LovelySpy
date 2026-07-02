@@ -193,21 +193,18 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     }
 
     public void executeDetection(Player player, String key, String responseVal, String vectorName, String checker) {
-        // Find matched ModEntry
-        Config.ModEntry matched = null;
-        for (Config.ModEntry entry : config.modEntries.values()) {
-            if (entry.keys.contains(key)) {
-                if (!entry.enabled) return;
-                matched = entry;
-                break;
-            }
-            if (entry.vector != null && entry.vector.equalsIgnoreCase("privacy_probe")
-                    && isPrivacyProbeEvidence(key)) {
-                if (!entry.enabled) return;
-                matched = entry;
-                break;
+        Config.ModEntry matched = isPrivacyProbeEvidence(key)
+                ? config.findPolicy("opsec", "privacy_probe")
+                : null;
+        if (matched == null) {
+            for (Config.ModEntry entry : config.modEntries.values()) {
+                if (entry.keys.contains(key)) {
+                    matched = entry;
+                    break;
+                }
             }
         }
+        if (matched != null && !matched.enabled) return;
 
         executeDetection(player, List.of(key), Map.of(key, responseVal), key, responseVal,
                 vectorName, checker, matched);
@@ -215,7 +212,8 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
 
     private boolean isPrivacyProbeEvidence(String key) {
         return key.equals("translation_shield")
-                || key.equals("opsec_key_resolution_blocked");
+                || key.equals("opsec_key_resolution_blocked")
+                || key.equals("sign_gui_bypass");
     }
 
     public void executeModDetection(Player player, Config.ModEntry matched,
@@ -524,11 +522,12 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
             try {
                 if (name.equals("ServerboundSignUpdatePacket")
                         && vector1.isProbing(player.getUniqueId())) {
+                    long receivedAtMillis = System.currentTimeMillis();
                     java.lang.reflect.Method getLinesMethod = msg.getClass().getMethod("getLines");
                     String[] lines = (String[]) getLinesMethod.invoke(msg);
                     
                     SchedulerHelper.runTask(LovelySpyPlugin.this, () -> {
-                        vector1.handleResponse(player.getUniqueId(), lines);
+                        vector1.handleResponse(player.getUniqueId(), lines, receivedAtMillis);
                     });
                     return; // consume packet
                 } else if (name.equals("ServerboundChatPacket")) {

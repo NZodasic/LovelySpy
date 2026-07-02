@@ -43,23 +43,25 @@ public final class Vector3_PrivacyModDetection implements Listener {
     }
 
     public void flagSignGuiBypass(Player player, long duration, String checker) {
-        Config.ModEntry opsecPolicy = null;
-        for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
-            if (entry.vector != null && entry.vector.equalsIgnoreCase("privacy_probe")) {
-                opsecPolicy = entry;
-                break;
-            }
-        }
-        if (opsecPolicy == null) {
-            opsecPolicy = plugin.getLovelyConfig().modEntries.get("opsec");
-        }
-        
-        String evidence = "Instant sign update response: " + duration + "ms (physically impossible; GUI bypassed/auto-closed)";
+        Config.ModEntry opsecPolicy =
+                plugin.getLovelyConfig().findPolicy("opsec", "privacy_probe");
+        String evidence = "Instant sign update response: " + duration
+                + "ms (physically impossible; GUI bypassed/auto-closed by "
+                + "OpSec/ExploitPreventer-style interception)";
         if (opsecPolicy != null && opsecPolicy.enabled) {
             plugin.executeModDetection(player, opsecPolicy, Map.of("sign_gui_bypass", evidence),
-                    "Vector 3 (Sign GUI Interception / OpSec Protection)", checker);
+                    "Vector 3 (Sign GUI Interception / OpSec)", checker);
+        } else if (opsecPolicy != null) {
+            plugin.getLogger().warning("OpSec GUI bypass detected for " + player.getName()
+                    + " (" + duration + "ms), but the privacy-probe policy is disabled.");
         } else {
-            plugin.getLogger().warning("OpSec GUI bypass detected for " + player.getName() + " (" + duration + "ms) but policy 'opsec' is disabled.");
+            // Config normally creates this built-in policy. Preserve the evidence as
+            // a FLAG if the runtime map was externally corrupted instead of silently
+            // discarding the detection or bypassing administrator policy.
+            plugin.getLogger().severe("OpSec GUI bypass detected, but no privacy-probe policy "
+                    + "is loaded; recording fallback evidence.");
+            plugin.executeDetection(player, "sign_gui_bypass", evidence,
+                    "Vector 3 (Sign GUI Interception / OpSec)", checker);
         }
     }
 

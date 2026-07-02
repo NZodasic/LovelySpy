@@ -335,6 +335,16 @@ public class Config {
 
     private boolean ensureBuiltInPolicyEntries() {
         boolean changed = false;
+        if (!modsYaml.contains("mods.opsec")) {
+            String path = "mods.opsec";
+            modsYaml.set(path + ".keys", List.of());
+            modsYaml.set(path + ".vector", "privacy_probe");
+            modsYaml.set(path + ".action", "BAN");
+            modsYaml.set(path + ".message",
+                    "Bypass Detected: OpSec / ExploitPreventer-style key-resolution protection");
+            modsYaml.set(path + ".enabled", true);
+            changed = true;
+        }
         if (!modsYaml.contains("mods.unverifiable_modded_client")) {
             String path = "mods.unverifiable_modded_client";
             modsYaml.set(path + ".keys", List.of());
@@ -356,10 +366,32 @@ public class Config {
             changed = true;
         }
         if (changed) {
-            plugin.getLogger().info("Added the built-in unverifiable-client and Baritone behavior policies "
-                    + "to mods.yml without changing existing entries.");
+            plugin.getLogger().info("Added missing built-in detection policies to mods.yml "
+                    + "without changing existing entries.");
         }
         return changed;
+    }
+
+    public ModEntry findPolicy(String preferredName, String vector) {
+        if (preferredName != null) {
+            ModEntry exact = modEntries.get(preferredName);
+            if (exact != null) {
+                return exact;
+            }
+            for (Map.Entry<String, ModEntry> entry : modEntries.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(preferredName)) {
+                    return entry.getValue();
+                }
+            }
+        }
+        if (vector != null) {
+            for (ModEntry entry : modEntries.values()) {
+                if (entry.vector != null && entry.vector.equalsIgnoreCase(vector)) {
+                    return entry;
+                }
+            }
+        }
+        return null;
     }
 
     private boolean containsAllIgnoreCase(List<String> values, List<String> required) {

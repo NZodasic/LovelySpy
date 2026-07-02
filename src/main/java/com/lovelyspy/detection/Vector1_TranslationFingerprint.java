@@ -113,6 +113,10 @@ public final class Vector1_TranslationFingerprint {
     }
 
     public void handleResponse(UUID uuid, String[] lines) {
+        handleResponse(uuid, lines, System.currentTimeMillis());
+    }
+
+    public void handleResponse(UUID uuid, String[] lines, long receivedAtMillis) {
         ProbeSession session = sessions.remove(uuid);
         if (session == null) return;
 
@@ -127,7 +131,9 @@ public final class Vector1_TranslationFingerprint {
         PacketHelper.restoreVirtualSign(player, session.getLocation());
 
         // Check if response is suspiciously fast (GUI bypass / OpSec / ExploitPreventer)
-        long duration = System.currentTimeMillis() - session.getStartTime();
+        // Use the Netty packet-arrival timestamp, not the later scheduled-handler
+        // time, so server tick delay cannot hide an instant client response.
+        long duration = responseDuration(session.getStartTime(), receivedAtMillis);
         
         // Feed to Vector9 Behavioral Paradox Engine for latency analysis
         plugin.getVector9().recordSignProbeLatency(player, duration);
@@ -136,7 +142,6 @@ public final class Vector1_TranslationFingerprint {
         long threshold = Math.max(100L, closeDelayMs - 70L);
         if (duration < threshold && !player.hasPermission("lovelyspy.bypass")) {
             plugin.getVector3().flagSignGuiBypass(player, duration, session.getChecker());
-            return;
         }
 
         if (session.isPrivacyProbe()) {
@@ -278,6 +283,10 @@ public final class Vector1_TranslationFingerprint {
             if (key == null || key.isBlank()) continue;
             target.add(key.trim());
         }
+    }
+
+    static long responseDuration(long probeStartedAtMillis, long packetReceivedAtMillis) {
+        return Math.max(0L, packetReceivedAtMillis - probeStartedAtMillis);
     }
 
     private List<String> takeNextKeys(Deque<String> pendingKeys, int maxKeys) {

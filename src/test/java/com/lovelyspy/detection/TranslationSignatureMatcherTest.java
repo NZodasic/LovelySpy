@@ -20,6 +20,8 @@ public final class TranslationSignatureMatcherTest {
         rejectsNoMeteorKeys();
         duplicateConfiguredKeysDoNotIncreaseConfidence();
         meteorProbeComponentsFitExploitFixerLimit();
+        packetArrivalTimestampExcludesSchedulerDelay();
+        responseDurationNeverBecomesNegative();
         baritoneBehaviorAloneIsInsufficient();
         grimFlagsAloneAreInsufficient();
         centeredTargetsAndGrimFlagsCorrelate();
@@ -78,6 +80,16 @@ public final class TranslationSignatureMatcherTest {
         }
         assertEquals(56, ProbeComponentSerializer.serialize(
                 "key.category.meteor-client.meteor-client").length());
+    }
+
+    private static void packetArrivalTimestampExcludesSchedulerDelay() {
+        long duration = Vector1_TranslationFingerprint.responseDuration(1_000L, 1_008L);
+        assertEquals(8L, duration);
+    }
+
+    private static void responseDurationNeverBecomesNegative() {
+        long duration = Vector1_TranslationFingerprint.responseDuration(1_001L, 1_000L);
+        assertEquals(0L, duration);
     }
 
     private static void baritoneBehaviorAloneIsInsufficient() {
