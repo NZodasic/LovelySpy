@@ -22,6 +22,18 @@ public final class TranslationSignatureMatcherTest {
         meteorProbeComponentsFitExploitFixerLimit();
         packetArrivalTimestampExcludesSchedulerDelay();
         responseDurationNeverBecomesNegative();
+        sprtAcceptsQuickResolvedProbeAsClean();
+        sprtAcceptsUnresolvedProbeAsShieldedEvidence();
+        sprtSlowBoundaryIsInclusive();
+        sprtDoesNotChangeAfterTerminalDecision();
+        adaptiveLatencyUsesFallbackDuringWarmup();
+        adaptiveLatencyNeverRaisesFixedBoundary();
+        adaptiveLatencyCanReduceBoundaryForJitter();
+        normalLikeTimingIsNotBimodal();
+        separatedTimingModesAreBimodal();
+        constantTimingHasNoBimodalityEvidence();
+        bimodalityMustPersistAcrossWindows();
+        packetTypesAreEvaluatedSeparately();
         timingAnomaliesRequireABurst();
         timingAnomalyAlertsRespectCooldown();
         staleTimingAnomaliesExpire();
@@ -93,6 +105,155 @@ public final class TranslationSignatureMatcherTest {
     private static void responseDurationNeverBecomesNegative() {
         long duration = Vector1_TranslationFingerprint.responseDuration(1_001L, 1_000L);
         assertEquals(0L, duration);
+    }
+
+    private static void sprtAcceptsQuickResolvedProbeAsClean() {
+        TranslationSPRT sprt = new TranslationSPRT(0.05, 0.10, 20, 50L, 150L);
+
+        assertEquals(TranslationSPRT.Decision.H0_ACCEPT,
+                sprt.update(true, 25L));
+        assertCondition(sprt.getLogLikelihoodRatio() < 0.0,
+                "A quick resolved translation must favor the clean hypothesis");
+    }
+
+    private static void sprtAcceptsUnresolvedProbeAsShieldedEvidence() {
+        TranslationSPRT sprt = new TranslationSPRT(0.05, 0.10, 20, 50L, 150L);
+
+        assertEquals(TranslationSPRT.Decision.H1_ACCEPT,
+                sprt.update(false, 25L));
+        assertCondition(sprt.getLogLikelihoodRatio() > 0.0,
+                "An unresolved control translation must favor the shield hypothesis");
+    }
+
+    private static void sprtSlowBoundaryIsInclusive() {
+        TranslationSPRT atBoundary =
+                new TranslationSPRT(0.05, 0.10, 20, 50L, 150L);
+        TranslationSPRT beyondBoundary =
+                new TranslationSPRT(0.05, 0.10, 20, 50L, 150L);
+
+        assertEquals(TranslationSPRT.Decision.CONTINUE,
+                atBoundary.update(true, 150L));
+        assertEquals(TranslationSPRT.Decision.H1_ACCEPT,
+                beyondBoundary.update(true, 151L));
+    }
+
+    private static void sprtDoesNotChangeAfterTerminalDecision() {
+        TranslationSPRT sprt = new TranslationSPRT(0.05, 0.10, 20, 50L, 150L);
+        sprt.update(false, 25L);
+        double terminalRatio = sprt.getLogLikelihoodRatio();
+
+        assertEquals(TranslationSPRT.Decision.H1_ACCEPT,
+                sprt.update(true, 25L));
+        assertEquals(terminalRatio, sprt.getLogLikelihoodRatio());
+        assertEquals(1, sprt.getSampleCount());
+    }
+
+    private static void adaptiveLatencyUsesFallbackDuringWarmup() {
+        AdaptiveLatencyThreshold threshold =
+                new AdaptiveLatencyThreshold(0.3, 3.5, 5, 30L);
+        threshold.update(150L);
+        threshold.update(151L);
+
+        assertEquals(100L, threshold.getThreshold(100L));
+    }
+
+    private static void adaptiveLatencyNeverRaisesFixedBoundary() {
+        AdaptiveLatencyThreshold threshold =
+                new AdaptiveLatencyThreshold(0.3, 3.5, 3, 30L);
+        threshold.update(200L);
+        threshold.update(200L);
+        threshold.update(200L);
+
+        assertEquals(100L, threshold.getThreshold(100L));
+    }
+
+    private static void adaptiveLatencyCanReduceBoundaryForJitter() {
+        AdaptiveLatencyThreshold threshold =
+                new AdaptiveLatencyThreshold(0.3, 3.5, 5, 30L);
+        threshold.update(100L);
+        threshold.update(200L);
+        threshold.update(100L);
+        threshold.update(200L);
+        threshold.update(100L);
+
+        assertCondition(threshold.getThreshold(100L) < 100L,
+                "A jittery baseline should lower the fast-response boundary");
+    }
+
+    private static void normalLikeTimingIsNotBimodal() {
+        List<Long> samples = new java.util.ArrayList<>();
+        addRepeated(samples, 997L, 1);
+        addRepeated(samples, 998L, 6);
+        addRepeated(samples, 999L, 24);
+        addRepeated(samples, 1_000L, 38);
+        addRepeated(samples, 1_001L, 24);
+        addRepeated(samples, 1_002L, 6);
+        addRepeated(samples, 1_003L, 1);
+
+        double coefficient =
+                TimingBimodalityDetector.computeCoefficient(samples);
+        assertCondition(coefficient < 0.555,
+                "A normal-like timing distribution must stay below the BC threshold");
+    }
+
+    private static void separatedTimingModesAreBimodal() {
+        List<Long> samples = new java.util.ArrayList<>();
+        addRepeated(samples, 100L, 50);
+        addRepeated(samples, 1_000L, 50);
+
+        double coefficient =
+                TimingBimodalityDetector.computeCoefficient(samples);
+        assertCondition(coefficient > 0.9,
+                "Two equally separated timing modes should have a high BC");
+    }
+
+    private static void constantTimingHasNoBimodalityEvidence() {
+        double coefficient = TimingBimodalityDetector.computeCoefficient(
+                java.util.Collections.nCopies(100, 250L));
+
+        assertEquals(0.0, coefficient);
+    }
+
+    private static void bimodalityMustPersistAcrossWindows() {
+        TimingBimodalityDetector detector =
+                new TimingBimodalityDetector(20, 2);
+        java.util.Optional<TimingBimodalityDetector.Result> result =
+                java.util.Optional.empty();
+
+        for (int i = 0; i < 20; i++) {
+            result = detector.addSample(
+                    "MovePacket", i % 2 == 0 ? 100L : 1_000L, 0.555);
+        }
+        assertCondition(result.isEmpty(),
+                "One bimodal window must not emit persistent evidence");
+
+        for (int i = 20; i < 25; i++) {
+            result = detector.addSample(
+                    "MovePacket", i % 2 == 0 ? 100L : 1_000L, 0.555);
+        }
+        assertCondition(result.isPresent(),
+                "A second shifted bimodal window should emit evidence");
+        assertEquals(2, result.orElseThrow().consecutiveWindows());
+    }
+
+    private static void packetTypesAreEvaluatedSeparately() {
+        TimingBimodalityDetector detector =
+                new TimingBimodalityDetector(20, 1);
+
+        for (int i = 0; i < 10; i++) {
+            assertCondition(detector.addSample(
+                            "FastPacket", 100L, 0.555).isEmpty(),
+                    "An undersized packet-type window must not be evaluated");
+            assertCondition(detector.addSample(
+                            "SlowPacket", 1_000L, 0.555).isEmpty(),
+                    "Unrelated packet types must not be pooled");
+        }
+    }
+
+    private static void addRepeated(List<Long> samples, long value, int count) {
+        for (int i = 0; i < count; i++) {
+            samples.add(value);
+        }
     }
 
     private static void timingAnomaliesRequireABurst() {

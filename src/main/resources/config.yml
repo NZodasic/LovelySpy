@@ -5,6 +5,39 @@ confirmation_delay_ms: 300     # Time between probe and confirmation pass
 probe_timeout_ticks: 100       # No-response threshold (100 ticks = 5 seconds)
 probe_batch_delay_ticks: 20    # Pace sign responses; avoids packet-funnel false flags
 sign_close_delay_ticks: 3      # 150ms render window; instant interceptors answer below the 100ms threshold
+
+# Vector 1: Adaptive Translation Fingerprinting
+vector1:
+  sprt:
+    alpha: 0.05                # Maximum target false-positive probability
+    beta: 0.10                 # Maximum target false-negative probability
+    max_samples: 20            # Hard cap before choosing the stronger hypothesis
+    fast_threshold_ms: 50      # Resolved-quickly likelihood boundary
+    slow_threshold_ms: 150     # Timeout/blocked likelihood boundary
+  adaptive_latency:
+    ewma_alpha: 0.3            # Responsiveness of the per-player latency baseline
+    chebyshev_k: 3.5           # Distribution-free lower-bound multiplier
+    minimum_samples: 5         # Keep the conservative fixed prior while warming up
+    minimum_threshold_ms: 30   # Never classify below this physical lower bound
+
+# OpSec research stack. Timing bimodality is weak correlation evidence only;
+# it cannot trigger an action without an independent Vector 9 signal.
+opsec_detection:
+  enabled: true
+  timing:
+    precision: NANOSECONDS
+    min_samples: 100
+  features:
+    timing_bimodality:
+      # Experimental until validated against clean packet traces. This analyzes
+      # inbound per-packet-type inter-arrival times, never server handler runtime.
+      enabled: false
+      threshold: 0.555
+      consecutive_windows: 3   # Require persistence across shifted windows
+  fpc:
+    min_observation_time_sec: 30
+    require_multiple_vectors: true
+
 vector9:
   fire_threshold: 8.0         # Weighted multi-signal score required for correlation detection
 canary_key: "key.forward"      # Primary vanilla control key; kept for older configs/GUI

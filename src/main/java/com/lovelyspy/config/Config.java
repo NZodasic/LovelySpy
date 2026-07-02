@@ -32,6 +32,21 @@ public class Config {
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
     public int signCloseDelayTicks;
+    public double vector1SprtAlpha;
+    public double vector1SprtBeta;
+    public int vector1SprtMaxSamples;
+    public int vector1SprtFastThresholdMs;
+    public int vector1SprtSlowThresholdMs;
+    public double vector1EwmaAlpha;
+    public double vector1ChebyshevK;
+    public int vector1AdaptiveMinimumSamples;
+    public int vector1AdaptiveMinimumThresholdMs;
+    public boolean opsecDetectionEnabled;
+    public boolean opsecTimingBimodalityEnabled;
+    public int opsecTimingMinimumSamples;
+    public double opsecTimingBimodalityThreshold;
+    public int opsecTimingBimodalityConsecutiveWindows;
+    public int opsecMinimumObservationTimeSeconds;
     public float vector9FireThreshold;
     public boolean baritoneBehaviorEnabled;
     public int baritoneEvidenceWindowSeconds;
@@ -92,6 +107,26 @@ public class Config {
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
         yaml.set("sign_close_delay_ticks", signCloseDelayTicks);
+        yaml.set("vector1.sprt.alpha", vector1SprtAlpha);
+        yaml.set("vector1.sprt.beta", vector1SprtBeta);
+        yaml.set("vector1.sprt.max_samples", vector1SprtMaxSamples);
+        yaml.set("vector1.sprt.fast_threshold_ms", vector1SprtFastThresholdMs);
+        yaml.set("vector1.sprt.slow_threshold_ms", vector1SprtSlowThresholdMs);
+        yaml.set("vector1.adaptive_latency.ewma_alpha", vector1EwmaAlpha);
+        yaml.set("vector1.adaptive_latency.chebyshev_k", vector1ChebyshevK);
+        yaml.set("vector1.adaptive_latency.minimum_samples", vector1AdaptiveMinimumSamples);
+        yaml.set("vector1.adaptive_latency.minimum_threshold_ms",
+                vector1AdaptiveMinimumThresholdMs);
+        yaml.set("opsec_detection.enabled", opsecDetectionEnabled);
+        yaml.set("opsec_detection.features.timing_bimodality.enabled",
+                opsecTimingBimodalityEnabled);
+        yaml.set("opsec_detection.timing.min_samples", opsecTimingMinimumSamples);
+        yaml.set("opsec_detection.features.timing_bimodality.threshold",
+                opsecTimingBimodalityThreshold);
+        yaml.set("opsec_detection.features.timing_bimodality.consecutive_windows",
+                opsecTimingBimodalityConsecutiveWindows);
+        yaml.set("opsec_detection.fpc.min_observation_time_sec",
+                opsecMinimumObservationTimeSeconds);
         yaml.set("vector9.fire_threshold", vector9FireThreshold);
         yaml.set("baritone-behavior.enabled", baritoneBehaviorEnabled);
         yaml.set("baritone-behavior.evidence-window-seconds", baritoneEvidenceWindowSeconds);
@@ -214,6 +249,50 @@ public class Config {
         probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
         signCloseDelayTicks = clamp(yaml.getInt("sign_close_delay_ticks", 3),
                 3, Math.max(3, probeTimeoutTicks - 1));
+        vector1SprtAlpha = clamp(yaml.getDouble("vector1.sprt.alpha", 0.05),
+                0.001, 0.49);
+        vector1SprtBeta = clamp(yaml.getDouble("vector1.sprt.beta", 0.10),
+                0.001, 0.49);
+        vector1SprtMaxSamples = clamp(
+                yaml.getInt("vector1.sprt.max_samples", 20), 1, 100);
+        vector1SprtSlowThresholdMs = clamp(
+                yaml.getInt("vector1.sprt.slow_threshold_ms", 150), 2, 10_000);
+        vector1SprtFastThresholdMs = clamp(
+                yaml.getInt("vector1.sprt.fast_threshold_ms", 50),
+                1, vector1SprtSlowThresholdMs - 1);
+        vector1EwmaAlpha = clamp(
+                yaml.getDouble("vector1.adaptive_latency.ewma_alpha", 0.3),
+                0.01, 1.0);
+        vector1ChebyshevK = clamp(
+                yaml.getDouble("vector1.adaptive_latency.chebyshev_k", 3.5),
+                0.1, 20.0);
+        vector1AdaptiveMinimumSamples = clamp(
+                yaml.getInt("vector1.adaptive_latency.minimum_samples", 5),
+                2, 100);
+        vector1AdaptiveMinimumThresholdMs = clamp(
+                yaml.getInt("vector1.adaptive_latency.minimum_threshold_ms", 30),
+                0, vector1SprtFastThresholdMs);
+        opsecDetectionEnabled = yaml.getBoolean("opsec_detection.enabled", true);
+        opsecTimingBimodalityEnabled = yaml.getBoolean(
+                "opsec_detection.features.timing_bimodality.enabled", false);
+        opsecTimingMinimumSamples = clamp(
+                yaml.getInt("opsec_detection.timing.min_samples", 100),
+                20, 1_000);
+        opsecTimingBimodalityThreshold = clamp(
+                yaml.getDouble(
+                        "opsec_detection.features.timing_bimodality.threshold",
+                        0.555),
+                0.1, 1.0);
+        opsecTimingBimodalityConsecutiveWindows = clamp(
+                yaml.getInt(
+                        "opsec_detection.features.timing_bimodality.consecutive_windows",
+                        3),
+                1, 10);
+        opsecMinimumObservationTimeSeconds = clamp(
+                yaml.getInt(
+                        "opsec_detection.fpc.min_observation_time_sec",
+                        30),
+                5, 600);
         vector9FireThreshold = (float) Math.max(1.0,
                 Math.min(100.0, yaml.getDouble("vector9.fire_threshold", 8.0)));
         baritoneBehaviorEnabled = yaml.getBoolean("baritone-behavior.enabled", true);
@@ -436,6 +515,13 @@ public class Config {
     }
 
     private int clamp(int value, int min, int max) {
+        return Math.max(min, Math.min(value, max));
+    }
+
+    private double clamp(double value, double min, double max) {
+        if (!Double.isFinite(value)) {
+            return min;
+        }
         return Math.max(min, Math.min(value, max));
     }
 

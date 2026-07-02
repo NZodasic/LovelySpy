@@ -18,6 +18,9 @@ public final class Vector1_TranslationFingerprint {
     private final Map<UUID, ProbeSession> sessions = new ConcurrentHashMap<>();
     private final Map<UUID, PrivacyProbeEvidence> privacyCandidates = new ConcurrentHashMap<>();
     private final Set<UUID> privacyConfirmationsScheduled = ConcurrentHashMap.newKeySet();
+    private final Map<UUID, TranslationSPRT> translationTests = new ConcurrentHashMap<>();
+    private final Map<UUID, AdaptiveLatencyThreshold> latencyThresholds = new ConcurrentHashMap<>();
+    private final Map<UUID, SprtEvidence> sprtEvidence = new ConcurrentHashMap<>();
 
     public Vector1_TranslationFingerprint(LovelySpyPlugin plugin) {
         this.plugin = plugin;
@@ -136,16 +139,23 @@ public final class Vector1_TranslationFingerprint {
         long duration = responseDuration(session.getStartTime(), receivedAtMillis);
         
         // Feed to Vector9 Behavioral Paradox Engine for latency analysis
-        plugin.getVector9().recordSignProbeLatency(player, duration);
-        
-        long closeDelayMs = plugin.getLovelyConfig().signCloseDelayTicks * 50L;
-        long threshold = Math.max(100L, closeDelayMs - 70L);
-        if (duration < threshold && !player.hasPermission("lovelyspy.bypass")) {
+        int controlLineIndex = session.isPrivacyProbe() ? 0 : 3;
+        PrivacyProbeEvidence controlEvidence =
+                analyzeControlLines(session.getControlKeys(), lines, controlLineIndex);
+        boolean controlResolved = !session.getControlKeys().isEmpty()
+                && !controlEvidence.hasUnresolved();
+        ProbeAssessment assessment =
+                recordProbeObservation(uuid, controlResolved, duration);
+        plugin.getVector9().recordSignProbeLatency(
+                player, duration, assessment.fastResponseThresholdMs());
+
+        if (duration < assessment.fastResponseThresholdMs()
+                && !player.hasPermission("lovelyspy.bypass")) {
             plugin.getVector3().flagSignGuiBypass(player, duration, session.getChecker());
         }
 
         if (session.isPrivacyProbe()) {
-            handlePrivacyResponse(player, session, lines);
+            handlePrivacyResponse(player, session, controlEvidence);
             return;
         }
 
@@ -157,7 +167,6 @@ public final class Vector1_TranslationFingerprint {
         // 1. Check the vanilla control key (Line 4 / Index 3). This is only a
         // candidate signal here; LovelySpy requires a later confirmation probe
         // before mapping it to the OpSec/ExploitPreventer policy entry.
-        PrivacyProbeEvidence controlEvidence = analyzeControlLines(session.getControlKeys(), lines, 3);
         recordPrivacyCandidate(uuid, controlEvidence);
 
         // 2. Check Mod keys (Lines 1-3)
@@ -403,12 +412,12 @@ public final class Vector1_TranslationFingerprint {
         return true;
     }
 
-    private void handlePrivacyResponse(Player player, ProbeSession session, String[] lines) {
+    private void handlePrivacyResponse(Player player, ProbeSession session,
+                                       PrivacyProbeEvidence pageEvidence) {
         PrivacyProbeState state = session.getPrivacyState();
         if (state == null) {
             return;
         }
-        PrivacyProbeEvidence pageEvidence = analyzeControlLines(session.getControlKeys(), lines, 0);
         state.record(pageEvidence);
 
         if (state.hasPending()) {
@@ -436,6 +445,7 @@ public final class Vector1_TranslationFingerprint {
         UUID uuid = player.getUniqueId();
         privacyConfirmationsScheduled.remove(uuid);
         PrivacyProbeEvidence firstPass = privacyCandidates.remove(uuid);
+        SprtEvidence statisticalEvidence = sprtEvidence.remove(uuid);
         if (firstPass == null || firstPass.unresolvedKeys().isEmpty()
                 || confirmationState == null || confirmationState.unresolvedKeys().isEmpty()) {
             return;
@@ -451,6 +461,14 @@ public final class Vector1_TranslationFingerprint {
                         + " (initial=" + printableResponse(firstPass.responses().get(key))
                         + ", confirmation=" + printableResponse(confirmationState.responses().get(key)) + ")")
                 .collect(java.util.stream.Collectors.joining("; "));
+        if (statisticalEvidence != null && statisticalEvidence.shieldDecisions() > 0) {
+            evidence += String.format(Locale.ROOT,
+                    "; SPRT accepted shield hypothesis %d time(s) "
+                            + "(latest log-likelihood ratio=%.3f over %d sample(s))",
+                    statisticalEvidence.shieldDecisions(),
+                    statisticalEvidence.lastLogLikelihoodRatio(),
+                    statisticalEvidence.lastSampleCount());
+        }
         plugin.getVector3().flagKeyResolutionShield(player, evidence, checker);
     }
 
@@ -559,6 +577,8 @@ public final class Vector1_TranslationFingerprint {
         ProbeSession session = sessions.remove(uuid);
         if (session == null) return;
 
+        long timeoutMs = plugin.getLovelyConfig().probeTimeoutTicks * 50L;
+        recordProbeObservation(uuid, false, timeoutMs);
         privacyCandidates.remove(uuid);
         privacyConfirmationsScheduled.remove(uuid);
 
@@ -576,6 +596,9 @@ public final class Vector1_TranslationFingerprint {
         cleanupSession(uuid);
         privacyCandidates.remove(uuid);
         privacyConfirmationsScheduled.remove(uuid);
+        translationTests.remove(uuid);
+        latencyThresholds.remove(uuid);
+        sprtEvidence.remove(uuid);
     }
 
     public void cleanup() {
@@ -584,6 +607,71 @@ public final class Vector1_TranslationFingerprint {
         }
         privacyCandidates.clear();
         privacyConfirmationsScheduled.clear();
+        translationTests.clear();
+        latencyThresholds.clear();
+        sprtEvidence.clear();
+    }
+
+    private ProbeAssessment recordProbeObservation(UUID uuid, boolean resolved,
+                                                   long responseTimeMs) {
+        Config config = plugin.getLovelyConfig();
+        long closeDelayMs = config.signCloseDelayTicks * 50L;
+        long fixedFastBoundary = Math.max(100L, closeDelayMs - 70L);
+
+        AdaptiveLatencyThreshold latency = latencyThresholds.computeIfAbsent(uuid,
+                ignored -> new AdaptiveLatencyThreshold(
+                        config.vector1EwmaAlpha,
+                        config.vector1ChebyshevK,
+                        config.vector1AdaptiveMinimumSamples,
+                        config.vector1AdaptiveMinimumThresholdMs));
+        long adaptiveFastBoundary;
+        synchronized (latency) {
+            adaptiveFastBoundary = latency.getThreshold(fixedFastBoundary);
+            // Only clearly resolved, non-instant samples are suitable clean-baseline
+            // observations. This prevents the suspected interceptor from teaching the
+            // adaptive threshold that its own response time is normal.
+            if (resolved && responseTimeMs >= adaptiveFastBoundary) {
+                latency.update(responseTimeMs);
+            }
+        }
+
+        TranslationSPRT test = translationTests.computeIfAbsent(uuid,
+                ignored -> new TranslationSPRT(
+                        config.vector1SprtAlpha,
+                        config.vector1SprtBeta,
+                        config.vector1SprtMaxSamples,
+                        config.vector1SprtFastThresholdMs,
+                        config.vector1SprtSlowThresholdMs));
+        TranslationSPRT.Decision decision;
+        double logLikelihoodRatio;
+        int sampleCount;
+        synchronized (test) {
+            if (test.isTerminal()) {
+                test.reset();
+            }
+            decision = test.update(resolved, responseTimeMs);
+            logLikelihoodRatio = test.getLogLikelihoodRatio();
+            sampleCount = test.getSampleCount();
+        }
+        if (!resolved && decision == TranslationSPRT.Decision.H1_ACCEPT) {
+            SprtEvidence latest = new SprtEvidence(
+                    1, logLikelihoodRatio, sampleCount);
+            sprtEvidence.merge(uuid, latest, SprtEvidence::merge);
+        }
+        return new ProbeAssessment(adaptiveFastBoundary);
+    }
+
+    private record ProbeAssessment(long fastResponseThresholdMs) {
+    }
+
+    private record SprtEvidence(int shieldDecisions, double lastLogLikelihoodRatio,
+                                int lastSampleCount) {
+        private SprtEvidence merge(SprtEvidence newer) {
+            return new SprtEvidence(
+                    shieldDecisions + newer.shieldDecisions,
+                    newer.lastLogLikelihoodRatio,
+                    newer.lastSampleCount);
+        }
     }
 
     private void cleanupSession(UUID uuid) {

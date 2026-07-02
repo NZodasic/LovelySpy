@@ -51,7 +51,8 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         KNOWN_PACKS_VANILLA_COUNT_ONLY(4),  // Fabric client but only vanilla core pack in known-packs
         KNOWN_PACKS_EMPTY_FABRIC(5),        // Fabric client with zero known packs
 
-        // Latency fingerprint (P5)
+        // Timing fingerprints
+        PACKET_TIMING_BIMODALITY(1),        // Weak Vector 6 evidence; never sufficient alone
         NETTY_SIGN_RESPONSE_ANOMALY(6);     // Z-score > 2.5 on sign-response latency histogram
 
         public final int weight;
@@ -90,6 +91,12 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         // P5: Netty latency anomaly with any other paradox
         addEdge(Signal.NETTY_SIGN_RESPONSE_ANOMALY, Signal.SIGN_INSTANT_RESPONSE_VANILLA, 4.0f);
         addEdge(Signal.NETTY_SIGN_RESPONSE_ANOMALY, Signal.VANILLA_BRAND_NO_CHANNELS,    2.5f);
+
+        // Research timing side-channel: only amplify independent client-facing
+        // contradictions. Inter-arrival bimodality remains weak evidence.
+        addEdge(Signal.PACKET_TIMING_BIMODALITY, Signal.SIGN_INSTANT_RESPONSE_VANILLA, 1.5f);
+        addEdge(Signal.PACKET_TIMING_BIMODALITY, Signal.TRANSLATION_BLOCK_VANILLA,     1.5f);
+        addEdge(Signal.PACKET_TIMING_BIMODALITY, Signal.PACK_ACCEPT_STALE_TRANSLATIONS, 1.4f);
     }
 
     private static void addEdge(Signal a, Signal b, float multiplier) {
@@ -192,6 +199,7 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
     private static final class PlayerEvidence {
         final SignalBloom bloom = new SignalBloom();
         final Map<Signal, Integer> signalCounts = new EnumMap<>(Signal.class);
+        final Map<Signal, String> signalDetails = new EnumMap<>(Signal.class);
         final LatencyWindow latency = new LatencyWindow();
         // Tracks the translation key values before and after pack accept
         final Map<String, String> prePackTranslations = new LinkedHashMap<>();
@@ -224,6 +232,10 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
      * @param signal the observed behavioral anomaly
      */
     public void recordSignal(Player player, Signal signal) {
+        recordSignal(player, signal, null);
+    }
+
+    private void recordSignal(Player player, Signal signal, String detail) {
         if (player.hasPermission("lovelyspy.bypass")) return;
 
         UUID uuid = player.getUniqueId();
@@ -235,6 +247,9 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         }
         evidence.bloom.add(signal);
         evidence.signalCounts.merge(signal, 1, Integer::sum);
+        if (detail != null && !detail.isBlank()) {
+            evidence.signalDetails.put(signal, detail);
+        }
         totalSignalsProcessed.incrementAndGet();
 
         // Schedule TTL expiry
@@ -246,10 +261,26 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         // Evaluate
         float score = computeParadoxScore(evidence.signalCounts);
         float fireThreshold = plugin.getLovelyConfig().vector9FireThreshold;
-        if (score >= fireThreshold && !evidence.hasFiredThisSession) {
+        if (evidence.signalCounts.size() >= 2
+                && score >= fireThreshold
+                && !evidence.hasFiredThisSession) {
             evidence.hasFiredThisSession = true;
             fireDetection(player, evidence, score, fireThreshold);
         }
+    }
+
+    /**
+     * Records persistent per-packet-type timing bimodality from Vector 6.
+     * This is intentionally a weak signal and requires independent Vector 9
+     * evidence before the paradox engine can act.
+     */
+    public void recordTimingBimodality(Player player, String packetType,
+                                       double coefficient, int sampleCount,
+                                       int consecutiveWindows) {
+        String detail = String.format(Locale.ROOT,
+                "packet=%s BC=%.3f samples=%d persistent_windows=%d",
+                packetType, coefficient, sampleCount, consecutiveWindows);
+        recordSignal(player, Signal.PACKET_TIMING_BIMODALITY, detail);
     }
 
     /**
@@ -260,6 +291,13 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
      * @param latencyMs   the measured response latency in milliseconds
      */
     public void recordSignProbeLatency(Player player, long latencyMs) {
+        long closeDelayMs = plugin.getLovelyConfig().signCloseDelayTicks * 50L;
+        recordSignProbeLatency(player, latencyMs,
+                Math.max(100L, closeDelayMs - 70L));
+    }
+
+    public void recordSignProbeLatency(Player player, long latencyMs,
+                                       long fastResponseThresholdMs) {
         if (player.hasPermission("lovelyspy.bypass")) return;
 
         UUID uuid = player.getUniqueId();
@@ -282,7 +320,7 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         ClientProfile profile = plugin.getVector2().getProfile(player);
         if (profile != null
                 && "vanilla".equalsIgnoreCase(profile.brand())
-                && latencyMs < computeThreshold()) {
+                && latencyMs < fastResponseThresholdMs) {
             recordSignal(player, Signal.SIGN_INSTANT_RESPONSE_VANILLA);
         }
     }
@@ -389,7 +427,7 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
      *   1. Sum base weights of all present signals — O(|signals|)
      *   2. For each edge in PARADOX_GRAPH where both endpoints are present,
      *      add (weightA + weightB) * (multiplier - 1.0) as a bonus — O(|signals|²) worst case
-     *      but bounded because |signals| ≤ Signal.values().length = 14
+     *      but bounded because |signals| ≤ Signal.values().length
      *
      * This is equivalent to a single BFS pass over the paradox DAG visiting
      * only nodes that are "active" (present in signalCounts).
@@ -434,6 +472,10 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         for (Map.Entry<Signal, Integer> entry : evidence.signalCounts.entrySet()) {
             evidenceStr.append(entry.getKey().name())
                     .append("×").append(entry.getValue()).append(" ");
+            String detail = evidence.signalDetails.get(entry.getKey());
+            if (detail != null) {
+                evidenceStr.append("[").append(detail).append("] ");
+            }
         }
         if (evidence.latency.size() >= 5) {
             evidenceStr.append(String.format("| latency_mean=%.1fms stddev=%.1fms",
@@ -460,6 +502,7 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
             PlayerEvidence evidence = evidenceMap.get(expired.uuid());
             if (evidence == null) continue;
             evidence.signalCounts.remove(expired.signal());
+            evidence.signalDetails.remove(expired.signal());
             // Clear bloom bit is impossible (Bloom filters are append-only), so
             // we clear the entire bloom when all signals expire for a player.
             if (evidence.signalCounts.isEmpty()) {
@@ -467,15 +510,6 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
                 evidence.hasFiredThisSession = false;
             }
         }
-    }
-
-    // ─── Utility ─────────────────────────────────────────────────────────────
-
-    private long computeThreshold() {
-        // Sign close delay config converted to ms, minus 70ms jitter buffer
-        // (same formula as Vector1_TranslationFingerprint.handleResponse)
-        long closeDelayMs = plugin.getLovelyConfig().signCloseDelayTicks * 50L;
-        return Math.max(100L, closeDelayMs - 70L);
     }
 
     @EventHandler

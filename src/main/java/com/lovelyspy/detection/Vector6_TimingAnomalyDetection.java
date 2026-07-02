@@ -2,6 +2,7 @@ package com.lovelyspy.detection;
 
 import com.lovelyspy.LovelySpyPlugin;
 import com.lovelyspy.config.Config;
+import com.lovelyspy.util.SchedulerHelper;
 import org.bukkit.entity.Player;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,7 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Uses sliding window statistical analysis to detect packet filtering anomalies
  * caused by OpSec's selective blocking mechanisms.
  * 
- * Algorithm: Sliding Window with Statistical Anomaly Detection
+ * Algorithms: Sliding Window Statistical Anomaly Detection and per-packet-type
+ * Sarle bimodality analysis.
  * - Maintains sliding window of packet timing samples
  * - Computes statistical metrics (mean, std dev, z-score)
  * - Detects anomalies using z-score thresholding
@@ -39,13 +41,15 @@ public final class Vector6_TimingAnomalyDetection {
      * Records a packet timing sample for anomaly detection
      */
     public void recordPacketTiming(Player player, String packetType, long durationNanos) {
-        if (player.hasPermission("lovelyspy.bypass") || !isTimingDetectionEnabled()) return;
-        
+        if (player.hasPermission("lovelyspy.bypass")
+                || !isTimingDetectionEnabled()) return;
+
         UUID uuid = player.getUniqueId();
-        TimingWindow window = timingWindows.computeIfAbsent(uuid, k -> new TimingWindow());
+        TimingWindow window = timingWindows.computeIfAbsent(
+                uuid, ignored -> createTimingWindow());
         
         window.addSample(packetType, durationNanos);
-        
+
         // Check for anomalies after sufficient samples
         if (window.getSampleCount() >= WINDOW_SIZE) {
             AnomalyResult result = window.detectAnomalies();
@@ -56,6 +60,40 @@ public final class Vector6_TimingAnomalyDetection {
             }
         }
     }
+
+    /**
+     * Records a monotonic inter-arrival interval for one inbound packet type.
+     * Unlike handler runtime, this is observable at the network boundary and
+     * cannot be distorted by LovelySpy's own packet-processing work.
+     */
+    public void recordPacketInterval(Player player, String packetType,
+                                     long intervalNanos) {
+        if (player.hasPermission("lovelyspy.bypass")) return;
+
+        Config config = plugin.getLovelyConfig();
+        if (!config.opsecDetectionEnabled
+                || !config.opsecTimingBimodalityEnabled) {
+            return;
+        }
+
+        TimingWindow window = timingWindows.computeIfAbsent(
+                player.getUniqueId(), ignored -> createTimingWindow());
+        window.recordBimodalitySample(
+                        packetType,
+                        intervalNanos,
+                        config.opsecTimingBimodalityThreshold)
+                .ifPresent(result ->
+                        SchedulerHelper.runTask(plugin, () -> {
+                            if (player.isOnline()) {
+                                plugin.getVector9().recordTimingBimodality(
+                                        player,
+                                        result.packetType(),
+                                        result.coefficient(),
+                                        result.sampleCount(),
+                                        result.consecutiveWindows());
+                            }
+                        }));
+    }
     
     /**
      * Records a blocked packet for pattern analysis
@@ -64,7 +102,8 @@ public final class Vector6_TimingAnomalyDetection {
         if (player.hasPermission("lovelyspy.bypass") || !isTimingDetectionEnabled()) return;
         
         UUID uuid = player.getUniqueId();
-        TimingWindow window = timingWindows.computeIfAbsent(uuid, k -> new TimingWindow());
+        TimingWindow window = timingWindows.computeIfAbsent(
+                uuid, ignored -> createTimingWindow());
         
         window.recordBlockedPacket(packetType);
         
@@ -126,6 +165,14 @@ public final class Vector6_TimingAnomalyDetection {
         return plugin.getLovelyConfig().findPolicy(
                 "opsec_timing_anomaly", "timing_anomaly");
     }
+
+    private TimingWindow createTimingWindow() {
+        Config config = plugin.getLovelyConfig();
+        return new TimingWindow(
+                config.opsecTimingMinimumSamples,
+                config.opsecTimingBimodalityConsecutiveWindows,
+                config.opsecMinimumObservationTimeSeconds * 1_000_000_000L);
+    }
     
     public void cleanupPlayer(UUID uuid) {
         timingWindows.remove(uuid);
@@ -142,6 +189,7 @@ public final class Vector6_TimingAnomalyDetection {
         private final LinkedList<Long> samples = new LinkedList<>();
         private final Map<String, Integer> blockedPacketCounts = new HashMap<>();
         private final Map<String, LinkedList<Long>> packetTypeSamples = new HashMap<>();
+        private final TimingBimodalityDetector bimodalityDetector;
         private double ema = 0.0;
         private long sum = 0;
         private int count = 0;
@@ -149,6 +197,15 @@ public final class Vector6_TimingAnomalyDetection {
                 ANOMALIES_REQUIRED, ANOMALY_BURST_WINDOW_MS, ALERT_COOLDOWN_MS);
         private final CooldownGate blockingAlertGate = new CooldownGate(ALERT_COOLDOWN_MS);
         private final CooldownGate consistencyAlertGate = new CooldownGate(ALERT_COOLDOWN_MS);
+
+        private TimingWindow(int bimodalityMinimumSamples,
+                             int bimodalityConsecutiveWindows,
+                             long minimumObservationNanos) {
+            this.bimodalityDetector = new TimingBimodalityDetector(
+                    bimodalityMinimumSamples,
+                    bimodalityConsecutiveWindows,
+                    minimumObservationNanos);
+        }
         
         public void addSample(String packetType, long durationNanos) {
             // Add to main window
@@ -176,6 +233,12 @@ public final class Vector6_TimingAnomalyDetection {
             if (typeSamples.size() > WINDOW_SIZE) {
                 typeSamples.removeFirst();
             }
+        }
+
+        public Optional<TimingBimodalityDetector.Result> recordBimodalitySample(
+                String packetType, long durationNanos, double threshold) {
+            return bimodalityDetector.addSample(
+                    packetType, durationNanos, threshold);
         }
         
         public void recordBlockedPacket(String packetType) {

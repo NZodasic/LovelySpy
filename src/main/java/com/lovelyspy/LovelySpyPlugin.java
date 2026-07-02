@@ -509,6 +509,7 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
     private class PlayerPacketHandler extends io.netty.channel.ChannelDuplexHandler {
         private final Player player;
         private final Map<String, Long> packetTimestamps = new HashMap<>();
+        private final Map<String, Long> inboundPacketTimes = new HashMap<>();
 
         public PlayerPacketHandler(Player player) {
             this.player = player;
@@ -518,7 +519,12 @@ public final class LovelySpyPlugin extends JavaPlugin implements Listener {
         public void channelRead(io.netty.channel.ChannelHandlerContext ctx, Object msg) throws Exception {
             long startTime = System.nanoTime();
             String name = msg.getClass().getSimpleName();
-            
+            Long previousArrival = inboundPacketTimes.put(name, startTime);
+            if (previousArrival != null) {
+                vector6.recordPacketInterval(
+                        player, name, startTime - previousArrival);
+            }
+
             try {
                 if (name.equals("ServerboundSignUpdatePacket")
                         && vector1.isProbing(player.getUniqueId())) {
