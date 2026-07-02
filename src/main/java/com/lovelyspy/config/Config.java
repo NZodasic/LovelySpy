@@ -15,6 +15,11 @@ public class Config {
             "key.meteor-client.open-commands",
             "key.category.meteor-client.meteor-client"
     );
+    private static final Map<String, String> CURRENT_METEOR_EXPECTED_VALUES = Map.of(
+            "key.meteor-client.open-gui", "Open GUI",
+            "key.meteor-client.open-commands", "Open Commands",
+            "key.category.meteor-client.meteor-client", "Meteor Client"
+    );
     private static final int CURRENT_METEOR_MIN_MATCHES = 1;
 
     private final LovelySpyPlugin plugin;
@@ -27,6 +32,7 @@ public class Config {
     public int probeTimeoutTicks;
     public int probeBatchDelayTicks;
     public int signCloseDelayTicks;
+    public float vector9FireThreshold;
     public boolean baritoneBehaviorEnabled;
     public int baritoneEvidenceWindowSeconds;
     public int baritoneMinimumCenteredTargets;
@@ -86,6 +92,7 @@ public class Config {
         yaml.set("probe_timeout_ticks", probeTimeoutTicks);
         yaml.set("probe_batch_delay_ticks", probeBatchDelayTicks);
         yaml.set("sign_close_delay_ticks", signCloseDelayTicks);
+        yaml.set("vector9.fire_threshold", vector9FireThreshold);
         yaml.set("baritone-behavior.enabled", baritoneBehaviorEnabled);
         yaml.set("baritone-behavior.evidence-window-seconds", baritoneEvidenceWindowSeconds);
         yaml.set("baritone-behavior.minimum-centered-targets", baritoneMinimumCenteredTargets);
@@ -138,6 +145,8 @@ public class Config {
             if (mod.keys != null) {
                 modsYaml.set(path + ".keys", mod.keys);
             }
+            modsYaml.set(path + ".expected_values",
+                    mod.expectedValues.isEmpty() ? null : mod.expectedValues);
             modsYaml.set(path + ".min_matches", mod.minMatches);
             if (mod.action != null) {
                 modsYaml.set(path + ".action", mod.action);
@@ -201,10 +210,12 @@ public class Config {
         // that burst can trip packet-funnel plugins before their VL has decayed.
         probeDelayTicks = Math.max(40, yaml.getInt("probe_delay_ticks", 40));
         confirmationDelayMs = yaml.getInt("confirmation_delay_ms", 300);
-        probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 60));
+        probeTimeoutTicks = Math.max(20, yaml.getInt("probe_timeout_ticks", 100));
         probeBatchDelayTicks = Math.max(1, yaml.getInt("probe_batch_delay_ticks", 20));
-        signCloseDelayTicks = clamp(yaml.getInt("sign_close_delay_ticks", 5),
+        signCloseDelayTicks = clamp(yaml.getInt("sign_close_delay_ticks", 3),
                 3, Math.max(3, probeTimeoutTicks - 1));
+        vector9FireThreshold = (float) Math.max(1.0,
+                Math.min(100.0, yaml.getDouble("vector9.fire_threshold", 8.0)));
         baritoneBehaviorEnabled = yaml.getBoolean("baritone-behavior.enabled", true);
         baritoneEvidenceWindowSeconds = clamp(
                 yaml.getInt("baritone-behavior.evidence-window-seconds", 120), 30, 600);
@@ -275,6 +286,7 @@ public class Config {
                 String message = modsYaml.getString(path + ".message", "Mod detected");
                 String vector = modsYaml.getString(path + ".vector");
                 List<String> keys = new ArrayList<>(modsYaml.getStringList(path + ".keys"));
+                Map<String, String> expectedValues = readStringMap(path + ".expected_values");
                 boolean migratedMeteor = keys.removeIf(
                         signature -> signature.equalsIgnoreCase(LEGACY_METEOR_KEY));
                 if (migratedMeteor) {
@@ -285,6 +297,8 @@ public class Config {
                     }
                     modsYaml.set(path + ".keys", keys);
                     modsYaml.set(path + ".min_matches", CURRENT_METEOR_MIN_MATCHES);
+                    expectedValues = new LinkedHashMap<>(CURRENT_METEOR_EXPECTED_VALUES);
+                    modsYaml.set(path + ".expected_values", expectedValues);
                     migratedSignatures = true;
                     plugin.getLogger().info("Migrated the obsolete Meteor Client translation signature "
                             + "to the current multi-key fingerprint.");
@@ -301,8 +315,17 @@ public class Config {
                             + "confirmed current Meteor key. The Meteor namespace is unique, and the "
                             + "probe still requires confirmation before action.");
                 }
+                if (key.equalsIgnoreCase("meteor_client") && expectedValues.isEmpty()
+                        && containsAllIgnoreCase(keys, CURRENT_METEOR_KEYS)) {
+                    expectedValues = new LinkedHashMap<>(CURRENT_METEOR_EXPECTED_VALUES);
+                    modsYaml.set(path + ".expected_values", expectedValues);
+                    migratedSignatures = true;
+                    plugin.getLogger().info("Added expected Meteor Client translation values "
+                            + "for key-resolution shield correlation.");
+                }
                 boolean enabled = modsYaml.getBoolean(path + ".enabled", true);
-                modEntries.put(key, new ModEntry(key, keys, minMatches, action, message, vector, enabled));
+                modEntries.put(key, new ModEntry(key, keys, expectedValues, minMatches,
+                        action, message, vector, enabled));
             }
         }
         if (migratedSignatures) {
@@ -347,6 +370,39 @@ public class Config {
         return true;
     }
 
+    private Map<String, String> readStringMap(String path) {
+        return readStringMap(modsYaml.getConfigurationSection(path));
+    }
+
+    static Map<String, String> readStringMap(ConfigurationSection section) {
+        if (section == null) {
+            return Map.of();
+        }
+        Map<String, String> values = new LinkedHashMap<>();
+        // Bukkit expands dots in map keys into nested sections. Reading recursive
+        // leaf paths reconstructs the original translation keys after save/reload.
+        for (Map.Entry<String, Object> entry : section.getValues(true).entrySet()) {
+            if (entry.getValue() instanceof String value && !value.isBlank()) {
+                values.put(entry.getKey(), value);
+            }
+        }
+        return values;
+    }
+
+    public String getExpectedValue(String key) {
+        if (key == null) {
+            return null;
+        }
+        for (ModEntry entry : modEntries.values()) {
+            for (Map.Entry<String, String> expected : entry.expectedValues.entrySet()) {
+                if (expected.getKey().equalsIgnoreCase(key)) {
+                    return expected.getValue();
+                }
+            }
+        }
+        return null;
+    }
+
     private int clamp(int value, int min, int max) {
         return Math.max(min, Math.min(value, max));
     }
@@ -386,6 +442,7 @@ public class Config {
     public static class ModEntry {
         public final String name;
         public final List<String> keys;
+        public final Map<String, String> expectedValues;
         public final int minMatches;
         public final String action;
         public final String message;
@@ -393,18 +450,27 @@ public class Config {
         public final boolean enabled;
 
         public ModEntry(String name, List<String> keys, String action, String message, String vector) {
-            this(name, keys, 1, action, message, vector, true);
+            this(name, keys, Map.of(), 1, action, message, vector, true);
         }
 
         public ModEntry(String name, List<String> keys, String action, String message, String vector,
                         boolean enabled) {
-            this(name, keys, 1, action, message, vector, enabled);
+            this(name, keys, Map.of(), 1, action, message, vector, enabled);
         }
 
         public ModEntry(String name, List<String> keys, int minMatches, String action, String message,
                         String vector, boolean enabled) {
+            this(name, keys, Map.of(), minMatches, action, message, vector, enabled);
+        }
+
+        public ModEntry(String name, List<String> keys, Map<String, String> expectedValues,
+                        int minMatches, String action, String message, String vector,
+                        boolean enabled) {
             this.name = name;
             this.keys = keys != null ? List.copyOf(keys) : List.of();
+            this.expectedValues = expectedValues != null
+                    ? Collections.unmodifiableMap(new LinkedHashMap<>(expectedValues))
+                    : Map.of();
             this.minMatches = Math.max(1, Math.min(minMatches,
                     this.keys.isEmpty() ? 1 : this.keys.size()));
             this.action = action;

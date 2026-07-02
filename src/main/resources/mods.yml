@@ -11,6 +11,10 @@ mods:
       - "key.meteor-client.open-gui"
       - "key.meteor-client.open-commands"
       - "key.category.meteor-client.meteor-client"
+    expected_values:
+      "key.meteor-client.open-gui": "Open GUI"
+      "key.meteor-client.open-commands": "Open Commands"
+      "key.category.meteor-client.meteor-client": "Meteor Client"
     min_matches: 1
     action: BAN
     message: "Hacked Client Detected: Meteor Client"

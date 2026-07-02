@@ -38,6 +38,7 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
         SIGN_INSTANT_RESPONSE_VANILLA(5),   // <threshold ms response AND vanilla brand
         SIGN_FAST_NO_GUI(4),                // Response faster than server close-delay (existing, re-weighted)
         TRANSLATION_BLOCK_VANILLA(5),       // Vanilla brand but translation keys return raw fallback
+        TRANSLATION_BLOCK_MODDED_ENV(2),    // Known mod key stayed raw in a modded environment
 
         // Chat paradoxes
         UNSIGNED_CHAT_PREMIUM_ACCOUNT(4),   // Premium account but unsigned messages
@@ -202,8 +203,6 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
     // ─── Engine State ─────────────────────────────────────────────────────────
 
     private static final long EVIDENCE_TTL_MS = 10 * 60 * 1000L; // 10 minutes
-    private static final float FIRE_THRESHOLD = 12.0f;            // Weighted score to trigger
-
     private final LovelySpyPlugin plugin;
     private final Map<UUID, PlayerEvidence> evidenceMap = new ConcurrentHashMap<>();
     // Global min-heap for TTL expiry — processed on each signal intake
@@ -246,9 +245,10 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
 
         // Evaluate
         float score = computeParadoxScore(evidence.signalCounts);
-        if (score >= FIRE_THRESHOLD && !evidence.hasFiredThisSession) {
+        float fireThreshold = plugin.getLovelyConfig().vector9FireThreshold;
+        if (score >= fireThreshold && !evidence.hasFiredThisSession) {
             evidence.hasFiredThisSession = true;
-            fireDetection(player, evidence, score);
+            fireDetection(player, evidence, score, fireThreshold);
         }
     }
 
@@ -389,7 +389,7 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
      *   1. Sum base weights of all present signals — O(|signals|)
      *   2. For each edge in PARADOX_GRAPH where both endpoints are present,
      *      add (weightA + weightB) * (multiplier - 1.0) as a bonus — O(|signals|²) worst case
-     *      but bounded because |signals| ≤ Signal.values().length = 13
+     *      but bounded because |signals| ≤ Signal.values().length = 14
      *
      * This is equivalent to a single BFS pass over the paradox DAG visiting
      * only nodes that are "active" (present in signalCounts).
@@ -426,9 +426,11 @@ public final class Vector9_BehavioralParadoxEngine implements Listener {
 
     // ─── Detection Firing ─────────────────────────────────────────────────────
 
-    private void fireDetection(Player player, PlayerEvidence evidence, float score) {
+    private void fireDetection(Player player, PlayerEvidence evidence, float score,
+                               float fireThreshold) {
         StringBuilder evidenceStr = new StringBuilder();
-        evidenceStr.append(String.format("Paradox score=%.1f (threshold=%.1f). Signals: ", score, FIRE_THRESHOLD));
+        evidenceStr.append(String.format("Paradox score=%.1f (threshold=%.1f). Signals: ",
+                score, fireThreshold));
         for (Map.Entry<Signal, Integer> entry : evidence.signalCounts.entrySet()) {
             evidenceStr.append(entry.getKey().name())
                     .append("×").append(entry.getValue()).append(" ");

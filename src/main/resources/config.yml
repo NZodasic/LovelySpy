@@ -2,9 +2,11 @@
 
 probe_delay_ticks: 40          # Wait 2s for the normal login packet burst to settle
 confirmation_delay_ms: 300     # Time between probe and confirmation pass
-probe_timeout_ticks: 60        # No-response threshold (60 ticks = 3 seconds)
+probe_timeout_ticks: 100       # No-response threshold (100 ticks = 5 seconds)
 probe_batch_delay_ticks: 20    # Pace sign responses; avoids packet-funnel false flags
-sign_close_delay_ticks: 5      # Close hidden sign after render; min 3 ticks to avoid corrupt responses
+sign_close_delay_ticks: 3      # 150ms render window; instant interceptors answer below the 100ms threshold
+vector9:
+  fire_threshold: 8.0         # Weighted multi-signal score required for correlation detection
 canary_key: "key.forward"      # Primary vanilla control key; kept for older configs/GUI
 privacy_control_keys:          # Vanilla keys that must resolve on normal clients
   - "gui.done"

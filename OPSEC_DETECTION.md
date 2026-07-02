@@ -37,7 +37,7 @@ LovelySpy now has **9 detection vectors** working together to detect OpSec:
 - **Sliding Window**: ArrayDeque-based latency ring for Z-score analysis
 
 **Key Components**:
-- **Signal Taxonomy**: 13 behavioral signals representing paradoxes
+- **Signal Taxonomy**: 14 behavioral signals representing paradoxes
 - **Paradox Graph**: Weighted edges connecting statistically impossible signal combinations
 - **Latency Window**: Fixed-capacity sliding window for sign-probe timing analysis
 - **Evidence Scoring**: Weighted sum with multiplicative bonuses for paradox combinations
@@ -69,6 +69,7 @@ OpSec's `ClientConnectionMixin` establishes a characteristic **packet interleavi
 | `SIGN_INSTANT_RESPONSE_VANILLA` | 5 | <threshold ms response AND vanilla brand |
 | `SIGN_FAST_NO_GUI` | 4 | Response faster than server close-delay |
 | `TRANSLATION_BLOCK_VANILLA` | 5 | Vanilla brand but translation keys return raw fallback |
+| `TRANSLATION_BLOCK_MODDED_ENV` | 2 | Known mod key stays raw in a modded environment (weak correlation only) |
 | `UNSIGNED_CHAT_PREMIUM_ACCOUNT` | 4 | Premium account but unsigned messages |
 | `PACK_ACCEPT_STALE_TRANSLATIONS` | 5 | Accepted pack but translations unchanged after accept |
 | `PACK_INSTANT_ACCEPT` | 3 | Instant resource pack accept (Vector 3) |
@@ -97,7 +98,8 @@ Where:
 - P4: `PACK_ACCEPT_STALE_TRANSLATIONS` + `PACK_INSTANT_ACCEPT` → 3.0× multiplier
 - P5: `NETTY_SIGN_RESPONSE_ANOMALY` + any other paradox → 2.5-4.0× multiplier
 
-**Detection Threshold**: Fire when weighted score ≥ 12.0
+**Detection Threshold**: Fire when the weighted score reaches the configurable
+`vector9.fire_threshold` value (8.0 by default).
 
 ### Bloom Filter Deduplication
 
@@ -176,9 +178,14 @@ resource_pack_probe_keys:
 
 ### Threshold Tuning
 
+```yaml
+vector9:
+  fire_threshold: 8.0
+```
+
 **Vector 6 Thresholds** (in code):
 - `EVIDENCE_TTL_MS = 10 * 60 * 1000L`: Evidence window duration (10 minutes)
-- `FIRE_THRESHOLD = 12.0`: Weighted paradox score to trigger detection
+- `vector9.fire_threshold = 8.0`: Weighted paradox score to trigger detection
 - `LatencyWindow.CAPACITY = 20`: Number of latency samples for Z-score baseline
 - `Z_SCORE_THRESHOLD = -2.5`: Z-score below which response is anomalously fast
 
@@ -189,14 +196,14 @@ resource_pack_probe_keys:
 **Vector 6**: O(1) signal recording + O(|signals|²) paradox scoring
 - Bloom filter operations are O(1)
 - Priority queue operations are O(log n) for TTL expiry
-- Paradox scoring is O(|signals|²) but bounded (≤13² = 169 operations)
+- Paradox scoring is O(|signals|²) but bounded (≤14² = 196 operations)
 - Latency window statistics are O(n) but n ≤ 20
 
 ### Memory Usage
 
 **Per-Player Memory**:
 - Bloom filter: 8 bytes (64-bit long)
-- Signal counts: ~200 bytes (EnumMap with 13 entries)
+- Signal counts: ~200 bytes (EnumMap with 14 entries)
 - Latency window: ~160 bytes (20 × 8 bytes)
 - Evidence queue: ~50 bytes (priority queue references)
 - **Total**: ~420 bytes per online player
@@ -206,7 +213,7 @@ resource_pack_probe_keys:
 1. **Bounded Data Structures**: All data structures have maximum sizes
 2. **Lazy TTL Expiry**: Evidence expires only when new signals arrive
 3. **Session Deduplication**: Bloom filter prevents score inflation
-4. **Bounded Scoring**: Maximum 13 signals limits computational cost
+4. **Bounded Scoring**: Maximum 14 signals limits computational cost
 
 ## Testing and Validation
 

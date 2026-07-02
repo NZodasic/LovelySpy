@@ -14,6 +14,7 @@ repositories {
 dependencies {
     compileOnly("org.purpurmc.purpur:purpur-api:1.21.11-R0.1-SNAPSHOT")
     compileOnly("io.netty:netty-all:4.1.97.Final")
+    testImplementation("org.purpurmc.purpur:purpur-api:1.21.11-R0.1-SNAPSHOT")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -40,10 +41,19 @@ val verifyTranslationSignatures by tasks.registering(JavaExec::class) {
     mainClass.set("com.lovelyspy.detection.TranslationSignatureMatcherTest")
 }
 
+val verifyExpectedValueConfig by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Checks that dotted translation keys survive YAML map loading."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.lovelyspy.config.ConfigExpectedValuesTest")
+}
+
 tasks.test {
     failOnNoDiscoveredTests = false
 }
 
 tasks.check {
     dependsOn(verifyTranslationSignatures)
+    dependsOn(verifyExpectedValueConfig)
 }

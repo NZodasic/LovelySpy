@@ -77,26 +77,31 @@ public final class Vector1_TranslationFingerprint {
         // echoes it back unchanged, keep it as candidate privacy-shield evidence.
         lines.add(controlKey);
 
-        // Send packets to the player. If LovelySpy cannot send the probe, do not create
-        // a session that later times out as a false sign_packet_blocked detection.
+        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest,
+                new ArrayList<>(remainingKeys), flaggedKeys, isConfirmation, checker, accumulatedResponses,
+                List.of(controlKey), null);
+
+        // Register before sending. A Netty-thread interceptor can synthesize a sign
+        // response immediately; registering afterwards leaves a race where the packet
+        // handler does not yet recognize the response as belonging to a probe.
+        sessions.put(player.getUniqueId(), session);
+
+        // If LovelySpy cannot send the probe, remove the pre-registered session so it
+        // cannot later time out as a false sign_packet_blocked detection.
         if (!PacketHelper.sendVirtualSign(player, loc, lines)) {
+            sessions.remove(player.getUniqueId(), session);
+            PacketHelper.restoreVirtualSign(player, loc);
             plugin.getLogger().warning("Skipped translation probe for " + player.getName()
                     + " because the virtual sign packets could not be sent.");
             return;
         }
 
-        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc, keysToTest,
-                new ArrayList<>(remainingKeys), flaggedKeys, isConfirmation, checker, accumulatedResponses,
-                List.of(controlKey), null);
-        
         // A timeout is inconclusive: lag, packet filtering, or client protection can
         // all prevent a response. It must never be presented as a named hack.
         SchedulerHelper.LovelyTask timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> {
             handleTimeout(player.getUniqueId());
         }, plugin.getLovelyConfig().probeTimeoutTicks);
         session.setTimeoutTask(timeoutTask);
-
-        sessions.put(player.getUniqueId(), session);
 
         // Let the client render translations before closing. Closing in the same
         // packet tick corrupts responses on Lunar/Fabric and caused mass positives.
@@ -165,6 +170,13 @@ public final class Vector1_TranslationFingerprint {
 
             if (!response.isEmpty() && !response.equals(key)) {
                 newFlagged.add(key);
+            } else if (plugin.getLovelyConfig().getExpectedValue(key) != null
+                    && isModdedEnvironment(player)) {
+                // A raw/empty response is indistinguishable from a clean client that
+                // simply lacks this mod. Keep it as weak correlation evidence only;
+                // Vector 9 still requires independent signals before taking action.
+                plugin.getVector9().recordSignal(player,
+                        Vector9_BehavioralParadoxEngine.Signal.TRANSLATION_BLOCK_MODDED_ENV);
             }
         }
         session.addResponses(responses);
@@ -357,19 +369,22 @@ public final class Vector1_TranslationFingerprint {
         List<String> keysToTest = state.takeBatch(SIGN_LINES);
         List<String> lines = paddedLines(keysToTest, SIGN_LINES);
 
+        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc,
+                List.of(), List.of(), List.of(), true, checker, Map.of(), keysToTest, state);
+        sessions.put(player.getUniqueId(), session);
+
         if (!PacketHelper.sendVirtualSign(player, loc, lines)) {
+            sessions.remove(player.getUniqueId(), session);
+            PacketHelper.restoreVirtualSign(player, loc);
             plugin.getLogger().warning("Skipped OpSec confirmation probe for " + player.getName()
                     + " because the virtual sign packets could not be sent.");
             return false;
         }
 
-        ProbeSession session = new ProbeSession(player.getUniqueId(), player.getName(), loc,
-                List.of(), List.of(), List.of(), true, checker, Map.of(), keysToTest, state);
         SchedulerHelper.LovelyTask timeoutTask = SchedulerHelper.runTaskLater(plugin, () -> {
             handleTimeout(player.getUniqueId());
         }, plugin.getLovelyConfig().probeTimeoutTicks);
         session.setTimeoutTask(timeoutTask);
-        sessions.put(player.getUniqueId(), session);
 
         SchedulerHelper.runTaskLater(plugin, () -> {
             if (sessions.get(player.getUniqueId()) == session && player.isOnline()) {
@@ -479,9 +494,7 @@ public final class Vector1_TranslationFingerprint {
     private void reportNoConfirmedSignatures(Player player, Map<String, String> responses,
                                              String checker) {
         ClientProfile profile = plugin.getVector2().getProfile(player);
-        boolean moddedEnvironment = !profile.loaders().isEmpty()
-                || profile.brand().toLowerCase(Locale.ROOT).contains("fabric")
-                || profile.brand().toLowerCase(Locale.ROOT).contains("forge");
+        boolean moddedEnvironment = isModdedEnvironment(profile);
         if (!moddedEnvironment) {
             plugin.getLogger().info("Player " + player.getName()
                     + " produced no confirmed translation signatures.");
@@ -508,6 +521,20 @@ public final class Vector1_TranslationFingerprint {
         plugin.getLogger().info("Player " + player.getName()
                 + " produced no confirmed translation signatures, but the result is UNVERIFIABLE "
                 + "against current key-resolution shields (" + loaders + ").");
+    }
+
+    private boolean isModdedEnvironment(Player player) {
+        return isModdedEnvironment(plugin.getVector2().getProfile(player));
+    }
+
+    private boolean isModdedEnvironment(ClientProfile profile) {
+        if (profile == null) {
+            return false;
+        }
+        String brand = profile.brand().toLowerCase(Locale.ROOT);
+        return !profile.loaders().isEmpty()
+                || brand.contains("fabric")
+                || brand.contains("forge");
     }
 
     private Config.ModEntry findVectorPolicy(String vector) {
