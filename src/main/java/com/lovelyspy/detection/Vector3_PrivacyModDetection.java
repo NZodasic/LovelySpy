@@ -1,6 +1,7 @@
 package com.lovelyspy.detection;
 
 import com.lovelyspy.LovelySpyPlugin;
+import com.lovelyspy.config.Config;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -39,6 +40,27 @@ public final class Vector3_PrivacyModDetection implements Listener {
         plugin.executeDetection(player, "opsec_key_resolution_blocked",
                 "Repeated vanilla key-resolution block: " + evidence + (resourcePackSpoofed ? " | Correlated with instant resource pack accept" : ""),
                 vectorName, checker);
+    }
+
+    public void flagSignGuiBypass(Player player, long duration, String checker) {
+        Config.ModEntry opsecPolicy = null;
+        for (Config.ModEntry entry : plugin.getLovelyConfig().modEntries.values()) {
+            if (entry.vector != null && entry.vector.equalsIgnoreCase("privacy_probe")) {
+                opsecPolicy = entry;
+                break;
+            }
+        }
+        if (opsecPolicy == null) {
+            opsecPolicy = plugin.getLovelyConfig().modEntries.get("opsec");
+        }
+        
+        String evidence = "Instant sign update response: " + duration + "ms (physically impossible; GUI bypassed/auto-closed)";
+        if (opsecPolicy != null && opsecPolicy.enabled) {
+            plugin.executeModDetection(player, opsecPolicy, Map.of("sign_gui_bypass", evidence),
+                    "Vector 3 (Sign GUI Interception / OpSec Protection)", checker);
+        } else {
+            plugin.getLogger().warning("OpSec GUI bypass detected for " + player.getName() + " (" + duration + "ms) but policy 'opsec' is disabled.");
+        }
     }
 
     public void flagSignTimeout(Player player) {

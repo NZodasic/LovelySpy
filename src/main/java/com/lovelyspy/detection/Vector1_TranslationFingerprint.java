@@ -121,6 +121,15 @@ public final class Vector1_TranslationFingerprint {
         // Restore block client-side
         PacketHelper.restoreVirtualSign(player, session.getLocation());
 
+        // Check if response is suspiciously fast (GUI bypass / OpSec / ExploitPreventer)
+        long duration = System.currentTimeMillis() - session.getStartTime();
+        long closeDelayMs = plugin.getLovelyConfig().signCloseDelayTicks * 50L;
+        long threshold = Math.max(100L, closeDelayMs - 70L);
+        if (duration < threshold && !player.hasPermission("lovelyspy.bypass")) {
+            plugin.getVector3().flagSignGuiBypass(player, duration, session.getChecker());
+            return;
+        }
+
         if (session.isPrivacyProbe()) {
             handlePrivacyResponse(player, session, lines);
             return;
